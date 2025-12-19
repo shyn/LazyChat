@@ -1,60 +1,58 @@
-# LazyChat - P2P¾ÖÓòÍøÁÄÌì¹¤¾ß
+# LazyChat - P2Pï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ì¹¤ï¿½ï¿½
 
-Ò»¸ö**½¡×³¡¢Ä£¿é»¯¡¢¿É²âÊÔ¡¢¸ßÐÔÄÜ**µÄÎÞ·þÎñÆ÷¾ÖÓòÍøÁÄÌìÓ¦ÓÃ£¬Ö§³Ö×Ô¶¯·¢ÏÖ¡¢ÎÄ×ÖÏûÏ¢¡¢Í¼Æ¬ºÍÎÄ¼þ´«Êä¡£
+Ò»ï¿½ï¿½**ï¿½ï¿½×³ï¿½ï¿½Ä£ï¿½é»¯ï¿½ï¿½ï¿½É²ï¿½ï¿½Ô¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½**ï¿½ï¿½ï¿½Þ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½Ã£ï¿½Ö§ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½Ö¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½Í¼Æ¬ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ä¡£
 
-## ? ÌØÐÔ
+## ? ï¿½ï¿½ï¿½ï¿½
 
-- ?? **×Ô¶¯·¢ÏÖ** - UDP¹ã²¥×Ô¶¯·¢ÏÖ¾ÖÓòÍøÄÚµÄÓÃ»§
-- ?? **¼´Ê±Í¨Ñ¶** - µã¶ÔµãÊµÊ±ÏûÏ¢´«Êä
-- ??? **Í¼Æ¬·ÖÏí** - ·¢ËÍºÍÔ¤ÀÀÍ¼Æ¬£¨JPG¡¢PNG¡¢GIF¡¢BMP£©
-- ?? **ÎÄ¼þ´«Êä** - ´óÎÄ¼þ·Ö¿é´«Êä£¬´ø½ø¶ÈÏÔÊ¾
-- ?? **ÓÃ»§×´Ì¬** - ÊµÊ±ÏÔÊ¾ÔÚÏß/ÀëÏß×´Ì¬
-- ?? **ÎÞÐè·þÎñÆ÷** - ÍêÈ«P2P¼Ü¹¹
-- ?? **²âÊÔÇý¶¯** - ¸ß²âÊÔ¸²¸ÇÂÊºÍÖÊÁ¿±£Ö¤
-- ? **¸ßÐÔÄÜÐòÁÐ»¯** - Ê¹ÓÃ MessagePack£¬±È´«Í³·½°¸¿ì 6-7 ±¶
+- ?? **ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½** - UDPï¿½ã²¥ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½ï¿½Ã»ï¿½
+- ?? **ï¿½ï¿½Ê±Í¨Ñ¶** - ï¿½ï¿½Ôµï¿½ÊµÊ±ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½
+- ??? **Í¼Æ¬ï¿½ï¿½ï¿½ï¿½** - ï¿½ï¿½ï¿½Íºï¿½Ô¤ï¿½ï¿½Í¼Æ¬ï¿½ï¿½JPGï¿½ï¿½PNGï¿½ï¿½GIFï¿½ï¿½BMPï¿½ï¿½
+- ?? **ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½** - ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½Ö¿é´«ï¿½ä£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¾
+- ?? **ï¿½Ã»ï¿½×´Ì¬** - ÊµÊ±ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½×´Ì¬
+- ?? **ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½** - ï¿½ï¿½È«P2Pï¿½Ü¹ï¿½
+- ?? **ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½** - ï¿½ß²ï¿½ï¿½Ô¸ï¿½ï¿½ï¿½ï¿½Êºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¤
+- ? **ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð»ï¿½** - Ê¹ï¿½ï¿½ MessagePackï¿½ï¿½ï¿½È´ï¿½Í³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 6-7 ï¿½ï¿½
 
-## ?? ¼¼ÊõÁÁµã
+## ?? ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-### ¸ßÐÔÄÜÐòÁÐ»¯
-- **MessagePack Ìæ´ú BinaryFormatter**
-  - ? 6-7±¶ÐòÁÐ»¯ËÙ¶ÈÌáÉý
-  - ?? 70% Êý¾ÝÌå»ý¼õÉÙ
-  - ?? Ïû³ý°²È«·çÏÕ
-  - ?? 85% CPU Ê¹ÓÃÂÊ½µµÍ
+### ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð»ï¿½
+- **MessagePack ï¿½ï¿½ï¿½ BinaryFormatter**
+  - ? 6-7ï¿½ï¿½ï¿½ï¿½ï¿½Ð»ï¿½ï¿½Ù¶ï¿½ï¿½ï¿½ï¿½ï¿½
+  - ?? 70% ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+  - ?? ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È«ï¿½ï¿½ï¿½ï¿½
+  - ?? 85% CPU Ê¹ï¿½ï¿½ï¿½Ê½ï¿½ï¿½ï¿½
 
-Ïê¼û [ÐÔÄÜ¶Ô±È±¨¸æ](PERFORMANCE_COMPARISON.md)
+### ï¿½ï¿½ï¿½ï¿½Ð­ï¿½ï¿½
+- **ï¿½ï¿½ï¿½ï¿½Ð­ï¿½ï¿½**: UDPï¿½ã²¥ï¿½ï¿½ï¿½Ë¿ï¿½8888ï¿½ï¿½
+- **Í¨ï¿½ï¿½Ð­ï¿½ï¿½**: TCPï¿½É¿ï¿½ï¿½ï¿½ï¿½ä£¨ï¿½Ë¿ï¿½9999ï¿½ï¿½
+- **ï¿½ï¿½Ï¢ï¿½ï¿½Ê½**: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ¹JSONï¿½ï¿½
 
-### ÍøÂçÐ­Òé
-- **·¢ÏÖÐ­Òé**: UDP¹ã²¥£¨¶Ë¿Ú8888£©
-- **Í¨ÐÅÐ­Òé**: TCP¿É¿¿´«Êä£¨¶Ë¿Ú9999£©
-- **ÏûÏ¢¸ñÊ½**: ¶þ½øÖÆÐòÁÐ»¯£¨¿ÉÀ©Õ¹JSON£©
+### ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½
+- **ï¿½Ö¿ï¿½ï¿½Ð¡**: 64KB
+- **ï¿½ï¿½ï¿½È¸ï¿½ï¿½ï¿½**: ÊµÊ±ï¿½ï¿½ï¿½È¸ï¿½ï¿½ï¿½
+- **ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½**: ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½
 
-### ÎÄ¼þ´«Êä
-- **·Ö¿é´óÐ¡**: 64KB
-- **½ø¶È¸ú×Ù**: ÊµÊ±½ø¶È¸üÐÂ
-- **´íÎó»Ö¸´**: ´«ÊäÊ§°Ü×Ô¶¯ÇåÀí
-
-### Òì³£´¦Àí
+### ï¿½ì³£ï¿½ï¿½ï¿½ï¿½
 ```csharp
-LazyChatException                  // »ù´¡Òì³£
-©À©¤©¤ NetworkException              // ÍøÂçÒì³£
-©À©¤©¤ FileTransferException         // ÎÄ¼þ´«ÊäÒì³£
-©À©¤©¤ PeerDiscoveryException        // ·¢ÏÖÒì³£
-©¸©¤©¤ MessageSerializationException // ÐòÁÐ»¯Òì³£
+LazyChatException                  // ï¿½ï¿½ï¿½ï¿½ï¿½ì³£
+ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ NetworkException              // ï¿½ï¿½ï¿½ï¿½ï¿½ì³£
+ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ FileTransferException         // ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ì³£
+ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ PeerDiscoveryException        // ï¿½ï¿½ï¿½ï¿½ï¿½ì³£
+ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ MessageSerializationException // ï¿½ï¿½ï¿½Ð»ï¿½ï¿½ì³£
 ```
 
-### ÈÕÖ¾¼ÇÂ¼
-- **ÎÄ¼þÈÕÖ¾**: ×Ô¶¯±£´æµ½±¾µØÓ¦ÓÃÊý¾ÝÄ¿Â¼
-- **¿ØÖÆÌ¨ÈÕÖ¾**: DEBUGÄ£Ê½ÏÂÊä³öµ½¿ØÖÆÌ¨
-- **ÈÕÖ¾¼¶±ð**: INFO, WARNING, ERROR, DEBUG
+### ï¿½ï¿½Ö¾ï¿½ï¿½Â¼
+- **ï¿½Ä¼ï¿½ï¿½ï¿½Ö¾**: ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½æµ½ï¿½ï¿½ï¿½ï¿½Ó¦ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿Â¼
+- **ï¿½ï¿½ï¿½ï¿½Ì¨ï¿½ï¿½Ö¾**: DEBUGÄ£Ê½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì¨
+- **ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½ï¿½**: INFO, WARNING, ERROR, DEBUG
 
-## ?? ¿ª·¢Ö¸ÄÏ
+## ?? ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
 
-### Ìí¼ÓÐÂ¹¦ÄÜ
+### ï¿½ï¿½ï¿½ï¿½ï¿½Â¹ï¿½ï¿½ï¿½
 
-×ñÑ­²âÊÔÇý¶¯¿ª·¢£¨TDD£©Á÷³Ì£º
+ï¿½ï¿½Ñ­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½TDDï¿½ï¿½ï¿½ï¿½ï¿½Ì£ï¿½
 
-1. **±àÐ´²âÊÔ**
+1. **ï¿½ï¿½Ð´ï¿½ï¿½ï¿½ï¿½**
 ```csharp
 [Test]
 public void NewFeature_Scenario_ExpectedResult()
@@ -70,30 +68,30 @@ public void NewFeature_Scenario_ExpectedResult()
 }
 ```
 
-2. **ÊµÏÖ¹¦ÄÜ** - ÈÃ²âÊÔÍ¨¹ý
+2. **Êµï¿½Ö¹ï¿½ï¿½ï¿½** - ï¿½Ã²ï¿½ï¿½ï¿½Í¨ï¿½ï¿½
 
-3. **ÖØ¹¹´úÂë** - ÔÚ²âÊÔ±£»¤ÏÂ¸Ä½øÉè¼Æ
+3. **ï¿½Ø¹ï¿½ï¿½ï¿½ï¿½ï¿½** - ï¿½Ú²ï¿½ï¿½Ô±ï¿½ï¿½ï¿½ï¿½Â¸Ä½ï¿½ï¿½ï¿½ï¿½
 
-### ´úÂë¹æ·¶
+### ï¿½ï¿½ï¿½ï¿½æ·¶
 
-- ? Ê¹ÓÃ½Ó¿Ú¶ø·Ç¾ßÌåÊµÏÖ
-- ? Í¨¹ý¹¹Ôìº¯Êý×¢ÈëÒÀÀµ
-- ? Ìí¼ÓXMLÎÄµµ×¢ÊÍ
-- ? ¼ÇÂ¼¹Ø¼ü²Ù×÷ÈÕÖ¾
-- ? ÑéÖ¤ÊäÈë²ÎÊý
-- ? Å×³öÓÐÒâÒåµÄÒì³£
+- ? Ê¹ï¿½Ã½Ó¿Ú¶ï¿½ï¿½Ç¾ï¿½ï¿½ï¿½Êµï¿½ï¿½
+- ? Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ìº¯ï¿½ï¿½×¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+- ? ï¿½ï¿½ï¿½ï¿½XMLï¿½Äµï¿½×¢ï¿½ï¿½
+- ? ï¿½ï¿½Â¼ï¿½Ø¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¾
+- ? ï¿½ï¿½Ö¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+- ? ï¿½×³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ì³£
 
-### Ê¾Àý£º´´½¨ÐÂ·þÎñ
+### Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â·ï¿½ï¿½ï¿½
 
 ```csharp
-// 1. ¶¨Òå½Ó¿Ú
+// 1. ï¿½ï¿½ï¿½ï¿½Ó¿ï¿½
 public interface IMyService : IDisposable
 {
     void DoWork();
     event EventHandler<string> WorkCompleted;
 }
 
-// 2. ÊµÏÖ·þÎñ
+// 2. Êµï¿½Ö·ï¿½ï¿½ï¿½
 public class MyService : IMyService
 {
     private readonly ILogger _logger;
@@ -108,7 +106,7 @@ public class MyService : IMyService
         try
         {
             _logger.LogInfo("Starting work");
-            // ÊµÏÖÂß¼­
+            // Êµï¿½ï¿½ï¿½ß¼ï¿½
             OnWorkCompleted("Success");
         }
         catch (Exception ex)
@@ -131,7 +129,7 @@ public class MyService : IMyService
     }
 }
 
-// 3. ±àÐ´²âÊÔ
+// 3. ï¿½ï¿½Ð´ï¿½ï¿½ï¿½ï¿½
 [TestFixture]
 public class MyServiceTests
 {
@@ -151,91 +149,91 @@ public class MyServiceTests
 }
 ```
 
-## ?? °²È«¿¼ÂÇ
+## ?? ï¿½ï¿½È«ï¿½ï¿½ï¿½ï¿½
 
-- ?? **¾ÖÓòÍøÏÞÖÆ**: ½öÔÚ¿ÉÐÅ¾ÖÓòÍøÊ¹ÓÃ
-- ?? **ÎÞ¼ÓÃÜ**: ÏûÏ¢Î´¼ÓÃÜ£¬²»½¨Òé´«ÊäÃô¸ÐÐÅÏ¢
-- ?? **·À»ðÇ½**: È·±£ÔÊÐíUDP 8888ºÍTCP 9999¶Ë¿Ú
-- ?? **ÎÄ¼þÑéÖ¤**: ½ÓÊÕÎÄ¼þÇ°Çë¼ì²éÀ´Ô´
+- ?? **ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½**: ï¿½ï¿½ï¿½Ú¿ï¿½ï¿½Å¾ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½
+- ?? **ï¿½Þ¼ï¿½ï¿½ï¿½**: ï¿½ï¿½Ï¢Î´ï¿½ï¿½ï¿½Ü£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½é´«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
+- ?? **ï¿½ï¿½ï¿½ï¿½Ç½**: È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½UDP 8888ï¿½ï¿½TCP 9999ï¿½Ë¿ï¿½
+- ?? **ï¿½Ä¼ï¿½ï¿½ï¿½Ö¤**: ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô´
 
-## ?? ¹ÊÕÏÅÅ³ý
+## ?? ï¿½ï¿½ï¿½ï¿½ï¿½Å³ï¿½
 
-### ÎÞ·¨·¢ÏÖÆäËûÓÃ»§
-- ¼ì²é·À»ðÇ½ÉèÖÃ
-- È·ÈÏÔÚÍ¬Ò»¾ÖÓòÍø¶Î
-- ÑéÖ¤UDP¶Ë¿Ú8888Î´±»Õ¼ÓÃ
+### ï¿½Þ·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã»ï¿½
+- ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç½ï¿½ï¿½ï¿½ï¿½
+- È·ï¿½ï¿½ï¿½ï¿½Í¬Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+- ï¿½ï¿½Ö¤UDPï¿½Ë¿ï¿½8888Î´ï¿½ï¿½Õ¼ï¿½ï¿½
 
-### ÏûÏ¢·¢ËÍÊ§°Ü
-- ¼ì²éTCP¶Ë¿Ú9999¿ÉÓÃÐÔ
-- ÑéÖ¤Ä¿±êÓÃ»§ÔÚÏß
-- ²é¿´ÈÕÖ¾ÎÄ¼þ»ñÈ¡ÏêÏ¸´íÎó
+### ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½
+- ï¿½ï¿½ï¿½TCPï¿½Ë¿ï¿½9999ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+- ï¿½ï¿½Ö¤Ä¿ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½
+- ï¿½é¿´ï¿½ï¿½Ö¾ï¿½Ä¼ï¿½ï¿½ï¿½È¡ï¿½ï¿½Ï¸ï¿½ï¿½ï¿½ï¿½
 
-### ÎÄ¼þ´«ÊäÖÐ¶Ï
-- ¼ì²é´ÅÅÌ¿Õ¼ä
-- ÑéÖ¤ÎÄ¼þÈ¨ÏÞ
-- ¼ì²éÍøÂçÁ¬½ÓÎÈ¶¨ÐÔ
+### ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½
+- ï¿½ï¿½ï¿½ï¿½ï¿½Ì¿Õ¼ï¿½
+- ï¿½ï¿½Ö¤ï¿½Ä¼ï¿½È¨ï¿½ï¿½
+- ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¶ï¿½ï¿½ï¿½
 
-## ?? ÐÔÄÜÖ¸±ê
+## ?? ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
 
-- **·¢ÏÖÑÓ³Ù**: < 5Ãë
-- **ÏûÏ¢ÑÓ³Ù**: < 100ms£¨¾ÖÓòÍø£©
-- **ÎÄ¼þ´«Êä**: ~10MB/s£¨È¡¾öÓÚÍøÂç£©
-- **ÄÚ´æÕ¼ÓÃ**: < 50MB£¨¿ÕÏÐ£©
-- **×î´ó²¢·¢ÓÃ»§**: 50+£¨ÀíÂÛÖµ£©
+- **ï¿½ï¿½ï¿½ï¿½ï¿½Ó³ï¿½**: < 5ï¿½ï¿½
+- **ï¿½ï¿½Ï¢ï¿½Ó³ï¿½**: < 100msï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+- **ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½**: ~10MB/sï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ç£©
+- **ï¿½Ú´ï¿½Õ¼ï¿½ï¿½**: < 50MBï¿½ï¿½ï¿½ï¿½ï¿½Ð£ï¿½
+- **ï¿½ï¿½ó²¢·ï¿½ï¿½Ã»ï¿½**: 50+ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½
 
-## ??? Â·ÏßÍ¼
+## ??? Â·ï¿½ï¿½Í¼
 
-### v1.1£¨¼Æ»®ÖÐ£©
-- [ ] ÏûÏ¢¼ÓÃÜ£¨AES£©
-- [ ] ÈºÁÄÖ§³Ö
-- [ ] ÏûÏ¢ÀúÊ·³Ö¾Ã»¯
-- [ ] ÀëÏßÏûÏ¢¶ÓÁÐ
-- [ ] ±íÇé·ûºÅÖ§³Ö
+### v1.1ï¿½ï¿½ï¿½Æ»ï¿½ï¿½Ð£ï¿½
+- [ ] ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½Ü£ï¿½AESï¿½ï¿½
+- [ ] Èºï¿½ï¿½Ö§ï¿½ï¿½
+- [ ] ï¿½ï¿½Ï¢ï¿½ï¿½Ê·ï¿½Ö¾Ã»ï¿½
+- [ ] ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½
+- [ ] ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö§ï¿½ï¿½
 
-### v1.2£¨¼Æ»®ÖÐ£©
-- [ ] ÓïÒôÏûÏ¢
-- [ ] ½ØÍ¼¹¤¾ß¼¯³É
-- [ ] Ö÷Ìâ¶¨ÖÆ
-- [ ] ¶àÓïÑÔÖ§³Ö
-- [ ] ÒÆ¶¯¶Ë°æ±¾
+### v1.2ï¿½ï¿½ï¿½Æ»ï¿½ï¿½Ð£ï¿½
+- [ ] ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
+- [ ] ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ß¼ï¿½ï¿½ï¿½
+- [ ] ï¿½ï¿½ï¿½â¶¨ï¿½ï¿½
+- [ ] ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö§ï¿½ï¿½
+- [ ] ï¿½Æ¶ï¿½ï¿½Ë°æ±¾
 
-### v2.0£¨¹æ»®ÖÐ£©
-- [ ] ¶Ëµ½¶Ë¼ÓÃÜ
-- [ ] ÊÓÆµÍ¨»°
-- [ ] ²å¼þÏµÍ³
-- [ ] ¿çÆ½Ì¨Ö§³Ö£¨.NET Core£©
+### v2.0ï¿½ï¿½ï¿½æ»®ï¿½Ð£ï¿½
+- [ ] ï¿½Ëµï¿½ï¿½Ë¼ï¿½ï¿½ï¿½
+- [ ] ï¿½ï¿½ÆµÍ¨ï¿½ï¿½
+- [ ] ï¿½ï¿½ï¿½ÏµÍ³
+- [ ] ï¿½ï¿½Æ½Ì¨Ö§ï¿½Ö£ï¿½.NET Coreï¿½ï¿½
 
-## ?? ¹±Ï×
+## ?? ï¿½ï¿½ï¿½ï¿½
 
-»¶Ó­¹±Ï×£¡Çë×ñÑ­ÒÔÏÂ²½Öè£º
+ï¿½ï¿½Ó­ï¿½ï¿½ï¿½×£ï¿½ï¿½ï¿½ï¿½ï¿½Ñ­ï¿½ï¿½ï¿½Â²ï¿½ï¿½è£º
 
-1. Fork±¾²Ö¿â
-2. ´´½¨ÌØÐÔ·ÖÖ§ (`git checkout -b feature/AmazingFeature`)
-3. ±àÐ´²âÊÔ
-4. ÊµÏÖ¹¦ÄÜ
-5. Ìá½»¸ü¸Ä (`git commit -m 'Add AmazingFeature'`)
-6. ÍÆËÍ·ÖÖ§ (`git push origin feature/AmazingFeature`)
-7. ¿ªÆôPull Request
+1. Forkï¿½ï¿½ï¿½Ö¿ï¿½
+2. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô·ï¿½Ö§ (`git checkout -b feature/AmazingFeature`)
+3. ï¿½ï¿½Ð´ï¿½ï¿½ï¿½ï¿½
+4. Êµï¿½Ö¹ï¿½ï¿½ï¿½
+5. ï¿½á½»ï¿½ï¿½ï¿½ï¿½ (`git commit -m 'Add AmazingFeature'`)
+6. ï¿½ï¿½ï¿½Í·ï¿½Ö§ (`git push origin feature/AmazingFeature`)
+7. ï¿½ï¿½ï¿½ï¿½Pull Request
 
-## ?? Ðí¿ÉÖ¤
+## ?? ï¿½ï¿½ï¿½ï¿½Ö¤
 
-±¾ÏîÄ¿²ÉÓÃ MIT Ðí¿ÉÖ¤ - ²é¿´ [LICENSE](LICENSE) ÎÄ¼þÁË½âÏêÇé
+ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½ï¿½ï¿½ MIT ï¿½ï¿½ï¿½ï¿½Ö¤ - ï¿½é¿´ [LICENSE](LICENSE) ï¿½Ä¼ï¿½ï¿½Ë½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-## ?? ×÷Õß
+## ?? ï¿½ï¿½ï¿½ï¿½
 
 LazyChat Team
 
-## ?? ÖÂÐ»
+## ?? ï¿½ï¿½Ð»
 
-- NUnit - ²âÊÔ¿ò¼Ü
-- Moq - Mocking¿ò¼Ü
-- .NET Framework - Ó¦ÓÃÆ½Ì¨
+- NUnit - ï¿½ï¿½ï¿½Ô¿ï¿½ï¿½
+- Moq - Mockingï¿½ï¿½ï¿½
+- .NET Framework - Ó¦ï¿½ï¿½Æ½Ì¨
 
-## ?? ÁªÏµ·½Ê½
+## ?? ï¿½ï¿½Ïµï¿½ï¿½Ê½
 
-- ÎÊÌâ·´À¡: [GitHub Issues](https://github.com/your-repo/issues)
-- ¹¦ÄÜ½¨Òé: [GitHub Discussions](https://github.com/your-repo/discussions)
+- ï¿½ï¿½ï¿½â·´ï¿½ï¿½: [GitHub Issues](https://github.com/your-repo/issues)
+- ï¿½ï¿½ï¿½Ü½ï¿½ï¿½ï¿½: [GitHub Discussions](https://github.com/your-repo/discussions)
 
 ---
 
-**×¢Òâ**: ±¾Ó¦ÓÃ½ö¹©Ñ§Ï°ºÍÄÚ²¿ÍøÂçÊ¹ÓÃ¡£ÇëÎðÔÚ¹«Íø»·¾³Ê¹ÓÃ£¬ÒÔÈ·±£Êý¾Ý°²È«¡£
+**×¢ï¿½ï¿½**: ï¿½ï¿½Ó¦ï¿½Ã½ï¿½ï¿½ï¿½Ñ§Ï°ï¿½ï¿½ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½Ã¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½Ã£ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½Ý°ï¿½È«ï¿½ï¿½
