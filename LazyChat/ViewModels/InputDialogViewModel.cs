@@ -19,8 +19,8 @@ namespace LazyChat.ViewModels
         public InputDialogViewModel()
         {
             // Design-time constructor
-            _title = "ÊäÈë¶Ô»°¿ò";
-            _prompt = "ÇëÊäÈëÄÚÈİ:";
+            _title = "è¾“å…¥å¯¹è¯æ¡†";
+            _prompt = "è¯·è¾“å…¥å†…å®¹:";
             _inputText = string.Empty;
             SetupCommands();
         }

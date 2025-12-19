@@ -7,7 +7,7 @@
         mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="620"
         x:Class="LazyChat.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Title="¾ÖÓòÍøÁÄÌì - LazyChat"
+        Title="å±€åŸŸç½‘èŠå¤©å®¤ - LazyChat"
         Width="1024" Height="620"
         MinWidth="800" MinHeight="600">
 
@@ -18,13 +18,13 @@
     <DockPanel>
         <!-- Menu Bar -->
         <Menu DockPanel.Dock="Top">
-            <MenuItem Header="ÎÄ¼þ(_F)">
-                <MenuItem Header="ÉèÖÃÓÃ»§Ãû(_U)" Command="{Binding SetUsernameCommand}"/>
+            <MenuItem Header="æ–‡ä»¶(_F)">
+                <MenuItem Header="è®¾ç½®ç”¨æˆ·å(_U)" Command="{Binding SetUsernameCommand}"/>
                 <Separator/>
-                <MenuItem Header="ÍË³ö(_X)" Command="{Binding ExitCommand}"/>
+                <MenuItem Header="é€€å‡º(_X)" Command="{Binding ExitCommand}"/>
             </MenuItem>
-            <MenuItem Header="°ïÖú(_H)">
-                <MenuItem Header="¹ØÓÚ(_A)" Command="{Binding AboutCommand}"/>
+            <MenuItem Header="å¸®åŠ©(_H)">
+                <MenuItem Header="å…³äºŽ(_A)" Command="{Binding AboutCommand}"/>
             </MenuItem>
         </Menu>
 
@@ -69,7 +69,7 @@
                         <!-- Message Input -->
                         <TextBox DockPanel.Dock="Top"
                                  Text="{Binding MessageText}"
-                                 Watermark="ÊäÈëÏûÏ¢... (Ctrl+Enter ·¢ËÍ)"
+                                 Watermark="è¾“å…¥æ¶ˆæ¯... (Ctrl+Enter å‘é€)"
                                  AcceptsReturn="True"
                                  MinHeight="50"
                                  MaxHeight="100"
@@ -78,9 +78,9 @@
                         
                         <!-- Buttons -->
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="5">
-                            <Button Content="Í¼Æ¬(_I)" Command="{Binding AttachImageCommand}" MinWidth="80"/>
-                            <Button Content="ÎÄ¼þ(_F)" Command="{Binding AttachFileCommand}" MinWidth="80"/>
-                            <Button Content="·¢ËÍ(_S)" Command="{Binding SendMessageCommand}" MinWidth="80" 
+                            <Button Content="å›¾ç‰‡(_I)" Command="{Binding AttachImageCommand}" MinWidth="80"/>
+                            <Button Content="æ–‡ä»¶(_F)" Command="{Binding AttachFileCommand}" MinWidth="80"/>
+                            <Button Content="å‘é€(_S)" Command="{Binding SendMessageCommand}" MinWidth="80" 
                                     Classes="accent"/>
                         </StackPanel>
                     </DockPanel>

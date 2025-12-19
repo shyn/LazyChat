@@ -45,8 +45,8 @@ namespace LazyChat.ViewModels
         }
 
         public string InfoText { get; private set; }
-        public string FileNameText => $"ÎÄ¼şÃû: {_transferInfo.FileName}";
-        public string FileSizeText => $"´óĞ¡: {FormatFileSize(_transferInfo.FileSize)}";
+        public string FileNameText => $"æ–‡ä»¶å: {_transferInfo.FileName}";
+        public string FileSizeText => $"å¤§å°: {FormatFileSize(_transferInfo.FileSize)}";
 
         public int Progress
         {
@@ -128,29 +128,29 @@ namespace LazyChat.ViewModels
         {
             if (_isReceiving)
             {
-                InfoText = $"{_transferInfo.SenderName} ÏëÒª·¢ËÍÎÄ¼ş¸øÄú:";
+                InfoText = $"{_transferInfo.SenderName} æƒ³è¦å‘é€æ–‡ä»¶ç»™æ‚¨:";
                 ShowProgress = false;
                 ShowAcceptReject = true;
                 ShowClose = false;
             }
             else
             {
-                InfoText = $"ÕıÔÚ·¢ËÍÎÄ¼şµ½ {_transferInfo.ReceiverId}:";
+                InfoText = $"æ­£åœ¨å‘é€æ–‡ä»¶ç»™ {_transferInfo.ReceiverId}:";
                 ShowProgress = true;
                 ShowAcceptReject = false;
                 ShowClose = false;
-                ProgressText = "½ø¶È: 0%";
+                ProgressText = "è¿›åº¦: 0%";
             }
         }
 
         public void UpdateProgress(int progress)
         {
             Progress = Math.Min(progress, 100);
-            ProgressText = $"½ø¶È: {progress}%";
+            ProgressText = $"è¿›åº¦: {progress}%";
 
             if (progress >= 100)
             {
-                ProgressText = "´«ÊäÍê³É!";
+                ProgressText = "ä¼ è¾“å®Œæˆ!";
                 ShowClose = true;
             }
         }
@@ -161,7 +161,7 @@ namespace LazyChat.ViewModels
             {
                 var file = await desktop.MainWindow.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
                 {
-                    Title = "±£´æÎÄ¼ş",
+                    Title = "ä¿å­˜æ–‡ä»¶",
                     SuggestedFileName = _transferInfo.FileName
                 });
 
@@ -170,10 +170,10 @@ namespace LazyChat.ViewModels
                     SavePath = file.Path.LocalPath;
                     IsAccepted = true;
 
-                    InfoText = "ÕıÔÚ½ÓÊÕÎÄ¼ş...";
+                    InfoText = "æ­£åœ¨æ¥æ”¶æ–‡ä»¶...";
                     ShowProgress = true;
                     ShowAcceptReject = false;
-                    ProgressText = "½ø¶È: 0%";
+                    ProgressText = "è¿›åº¦: 0%";
                 }
                 else
                 {

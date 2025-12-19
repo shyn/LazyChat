@@ -42,7 +42,7 @@ namespace LazyChat.ViewModels
             Messages = new ObservableCollection<MessageViewModel>();
             _conversations = new Dictionary<string, Conversation>();
             _activeTransferWindows = new Dictionary<string, Window>();
-            _statusText = "¾ÍĞ÷";
+            _statusText = "å°±ç»ª";
 
             SendMessageCommand = new RelayCommand(SendTextMessage, () => SelectedPeer != null && !string.IsNullOrWhiteSpace(MessageText));
             AttachImageCommand = new RelayCommand(async () => await AttachImageAsync(), () => SelectedPeer != null);
@@ -52,15 +52,15 @@ namespace LazyChat.ViewModels
             AboutCommand = new RelayCommand(ShowAbout);
         }
 
-        public string UserListHeader => $"ÔÚÏßÓÃ»§ ({OnlinePeers.Count})";
+        public string UserListHeader => $"åœ¨çº¿ç”¨æˆ· ({OnlinePeers.Count})";
 
         public string ChatHeaderText
         {
             get
             {
                 if (SelectedPeer == null)
-                    return "ÇëÑ¡ÔñÒ»¸öÓÃ»§¿ªÊ¼ÁÄÌì";
-                return $"Óë {SelectedPeer.UserName} ÁÄÌì";
+                    return "è¯·é€‰æ‹©ä¸€ä¸ªç”¨æˆ·å¼€å§‹èŠå¤©";
+                return $"ä¸ {SelectedPeer.UserName} èŠå¤©";
             }
         }
 
@@ -127,7 +127,7 @@ namespace LazyChat.ViewModels
 
             _userName = Environment.UserName;
 
-            var inputDialog = new Views.InputDialog("ÉèÖÃÓÃ»§Ãû", "ÇëÊäÈëÄúµÄÓÃ»§Ãû:", _userName);
+            var inputDialog = new Views.InputDialog("è®¾ç½®ç”¨æˆ·å", "è¯·è¾“å…¥æ‚¨çš„ç”¨æˆ·å:", _userName);
             var result = await inputDialog.ShowDialog<bool>(owner);
             if (result && !string.IsNullOrWhiteSpace(inputDialog.InputText))
             {
@@ -164,11 +164,11 @@ namespace LazyChat.ViewModels
             {
                 _commService.Start();
                 _discoveryService.Start();
-                StatusText = "·şÎñÒÑÆô¶¯,ÕıÔÚ·¢ÏÖ¾ÖÓòÍøÓÃ»§...";
+                StatusText = "æœåŠ¡å·²å¯åŠ¨,æ­£åœ¨å‘ç°å±€åŸŸç½‘ç”¨æˆ·...";
             }
             catch (Exception ex)
             {
-                ShowError("Æô¶¯·şÎñÊ§°Ü: " + ex.Message);
+                ShowError("å¯åŠ¨æœåŠ¡å¤±è´¥: " + ex.Message);
             }
         }
 
@@ -180,7 +180,7 @@ namespace LazyChat.ViewModels
                 {
                     OnlinePeers.Add(peer);
                     OnPropertyChanged(nameof(UserListHeader));
-                    StatusText = $"{peer.UserName} ÉÏÏßÁË";
+                    StatusText = $"{peer.UserName} å·²ä¸Šçº¿";
                 }
             });
         }
@@ -194,7 +194,7 @@ namespace LazyChat.ViewModels
                 {
                     OnlinePeers.Remove(existingPeer);
                     OnPropertyChanged(nameof(UserListHeader));
-                    StatusText = $"{peer.UserName} ÏÂÏßÁË";
+                    StatusText = $"{peer.UserName} å·²ç¦»çº¿";
 
                     if (SelectedPeer?.PeerId == peer.PeerId)
                     {
@@ -277,7 +277,7 @@ namespace LazyChat.ViewModels
             catch
             {
                 chatMsg.MessageType = ChatMessageType.System;
-                chatMsg.TextContent = "ÎŞ·¨¼ÓÔØÍ¼Æ¬";
+                chatMsg.TextContent = "æ— æ³•åŠ è½½å›¾ç‰‡";
             }
 
             AddMessageToConversation(message.SenderId, message.SenderName, chatMsg);
@@ -285,12 +285,12 @@ namespace LazyChat.ViewModels
 
         private void HandleFileTransferAccept(NetworkMessage message)
         {
-            StatusText = $"{message.SenderName} ½ÓÊÜÁËÎÄ¼ş´«Êä";
+            StatusText = $"{message.SenderName} æ¥å—äº†æ–‡ä»¶ä¼ è¾“";
         }
 
         private void HandleFileTransferReject(NetworkMessage message)
         {
-            StatusText = $"{message.SenderName} ¾Ü¾øÁËÎÄ¼ş´«Êä";
+            StatusText = $"{message.SenderName} æ‹’ç»äº†æ–‡ä»¶ä¼ è¾“";
             if (_activeTransferWindows.ContainsKey(message.FileId))
             {
                 _activeTransferWindows[message.FileId].Close();
@@ -343,7 +343,7 @@ namespace LazyChat.ViewModels
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                StatusText = $"ÎÄ¼ş´«ÊäÍê³É: {transfer.FileName}";
+                StatusText = $"æ–‡ä»¶ä¼ è¾“å®Œæˆ: {transfer.FileName}";
             });
         }
 
@@ -351,8 +351,8 @@ namespace LazyChat.ViewModels
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                StatusText = $"ÎÄ¼ş´«ÊäÊ§°Ü: {transfer.FileName}";
-                ShowError("ÎÄ¼ş´«ÊäÊ§°Ü!");
+                StatusText = $"æ–‡ä»¶ä¼ è¾“å¤±è´¥: {transfer.FileName}";
+                ShowError("æ–‡ä»¶ä¼ è¾“å¤±è´¥!");
             });
         }
 
@@ -425,7 +425,7 @@ namespace LazyChat.ViewModels
             }
             else
             {
-                ShowError("·¢ËÍÊ§°Ü!");
+                ShowError("å‘é€å¤±è´¥!");
             }
         }
 
@@ -433,7 +433,7 @@ namespace LazyChat.ViewModels
         {
             if (SelectedPeer == null)
             {
-                ShowInfo("ÇëÏÈÑ¡ÔñÒ»¸öÓÃ»§!");
+                ShowInfo("è¯·å…ˆé€‰æ‹©ä¸€ä¸ªç”¨æˆ·!");
                 return;
             }
 
@@ -441,10 +441,10 @@ namespace LazyChat.ViewModels
             {
                 var files = await desktop.MainWindow.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
                 {
-                    Title = "Ñ¡ÔñÍ¼Æ¬",
+                    Title = "é€‰æ‹©å›¾ç‰‡",
                     AllowMultiple = false,
                     FileTypeFilter = new[] {
-                        new FilePickerFileType("Í¼Æ¬ÎÄ¼ş") { Patterns = new[] { "*.jpg", "*.jpeg", "*.png", "*.gif", "*.bmp" } }
+                        new FilePickerFileType("å›¾ç‰‡æ–‡ä»¶") { Patterns = new[] { "*.jpg", "*.jpeg", "*.png", "*.gif", "*.bmp" } }
                     }
                 });
 
@@ -460,7 +460,7 @@ namespace LazyChat.ViewModels
         {
             if (SelectedPeer == null)
             {
-                ShowInfo("ÇëÏÈÑ¡ÔñÒ»¸öÓÃ»§!");
+                ShowInfo("è¯·å…ˆé€‰æ‹©ä¸€ä¸ªç”¨æˆ·!");
                 return;
             }
 
@@ -468,7 +468,7 @@ namespace LazyChat.ViewModels
             {
                 var files = await desktop.MainWindow.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
                 {
-                    Title = "Ñ¡ÔñÎÄ¼ş",
+                    Title = "é€‰æ‹©æ–‡ä»¶",
                     AllowMultiple = false
                 });
 
@@ -502,25 +502,25 @@ namespace LazyChat.ViewModels
                 }
                 else
                 {
-                    ShowError("·¢ËÍÍ¼Æ¬Ê§°Ü!");
+                    ShowError("å‘é€å›¾ç‰‡å¤±è´¥!");
                 }
             }
             catch (Exception ex)
             {
-                ShowError("ÎŞ·¨¼ÓÔØÍ¼Æ¬: " + ex.Message);
+                ShowError("æ— æ³•åŠ è½½å›¾ç‰‡: " + ex.Message);
             }
         }
 
         private async Task SetUsernameAsync()
         {
-            var inputDialog = new Views.InputDialog("ÉèÖÃÓÃ»§Ãû", "ÇëÊäÈëĞÂµÄÓÃ»§Ãû:", _userName);
+            var inputDialog = new Views.InputDialog("è®¾ç½®ç”¨æˆ·å", "è¯·è¾“å…¥æ–°çš„ç”¨æˆ·å:", _userName);
             if (Application.Current.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 var result = await inputDialog.ShowDialog<bool>(desktop.MainWindow);
                 if (result && !string.IsNullOrWhiteSpace(inputDialog.InputText))
                 {
                     _userName = inputDialog.InputText;
-                    StatusText = "ÓÃ»§ÃûÒÑ¸üĞÂ";
+                    StatusText = "ç”¨æˆ·åå·²æ›´æ–°";
                 }
             }
         }
@@ -535,14 +535,14 @@ namespace LazyChat.ViewModels
 
         private void ShowAbout()
         {
-            ShowInfo("LazyChat - ¾ÖÓòÍøÁÄÌì¹¤¾ß\n\nÖ§³ÖÎÄ×ÖÏûÏ¢¡¢Í¼Æ¬ºÍÎÄ¼ş´«Êä\nÎŞĞè·şÎñÆ÷,×Ô¶¯·¢ÏÖ¾ÖÓòÍøÓÃ»§\n\nVersion 1.0\n\nÏÖÒÑÖ§³Ö¿çÆ½Ì¨ÔËĞĞ!");
+            ShowInfo("LazyChat - å±€åŸŸç½‘èŠå¤©å·¥å…·\n\næ”¯æŒæ–‡å­—æ¶ˆæ¯ã€å›¾ç‰‡å’Œæ–‡ä»¶ä¼ è¾“\næ— éœ€æœåŠ¡å™¨,è‡ªåŠ¨å‘ç°å±€åŸŸç½‘ç”¨æˆ·\n\nVersion 1.0\n\nç°åœ¨æ”¯æŒè·¨å¹³å°è¿è¡Œ!");
         }
 
         private void Service_ErrorOccurred(object sender, string error)
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                StatusText = "´íÎó: " + error;
+                StatusText = "é”™è¯¯: " + error;
             });
         }
 
@@ -552,7 +552,7 @@ namespace LazyChat.ViewModels
             {
                 var dialog = new Window
                 {
-                    Title = "´íÎó",
+                    Title = "é”™è¯¯",
                     Width = 400,
                     Height = 150,
                     Content = new StackPanel
@@ -562,7 +562,7 @@ namespace LazyChat.ViewModels
                         Children =
                         {
                             new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap },
-                            new Button { Content = "È·¶¨", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right }
+                            new Button { Content = "ç¡®å®š", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right }
                         }
                     }
                 };
@@ -614,7 +614,7 @@ namespace LazyChat.ViewModels
 
         public Bitmap ImageBitmap => _message.ImageContent;
 
-        public string FileDisplayText => $"?? {_message.FileName} ({FormatFileSize(_message.FileSize)})";
+        public string FileDisplayText => $"ğŸ“ {_message.FileName} ({FormatFileSize(_message.FileSize)})";
 
         private string FormatFileSize(long bytes)
         {

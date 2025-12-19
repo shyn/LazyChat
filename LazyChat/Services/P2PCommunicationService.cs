@@ -46,7 +46,7 @@ namespace LazyChat.Services
             }
             catch (Exception ex)
             {
-                ErrorOccurred?.Invoke(this, "Æô¶¯Í¨ĞÅ·şÎñÊ§°Ü: " + ex.Message);
+                ErrorOccurred?.Invoke(this, "å¯åŠ¨é€šè®¯æœåŠ¡å¤±è´¥: " + ex.Message);
             }
         }
 
@@ -108,7 +108,7 @@ namespace LazyChat.Services
                 {
                     if (_isRunning)
                     {
-                        ErrorOccurred?.Invoke(this, "½ÓÊÜÁ¬½ÓÊ§°Ü: " + ex.Message);
+                        ErrorOccurred?.Invoke(this, "ç›‘å¬è¿æ¥å¤±è´¥: " + ex.Message);
                     }
                 }
             }
@@ -162,7 +162,7 @@ namespace LazyChat.Services
             }
             catch (Exception ex)
             {
-                ErrorOccurred?.Invoke(this, "´¦Àí¿Í»§¶ËÏûÏ¢Ê§°Ü: " + ex.Message);
+                ErrorOccurred?.Invoke(this, "å¤„ç†å®¢æˆ·ç«¯æ¶ˆæ¯å¤±è´¥: " + ex.Message);
             }
             finally
             {
@@ -229,7 +229,7 @@ namespace LazyChat.Services
             }
             catch (Exception ex)
             {
-                ErrorOccurred?.Invoke(this, "·¢ËÍÏûÏ¢Ê§°Ü: " + ex.Message);
+                ErrorOccurred?.Invoke(this, "å‘é€æ¶ˆæ¯å¤±è´¥: " + ex.Message);
 
                 if (isNewConnection && client != null)
                 {

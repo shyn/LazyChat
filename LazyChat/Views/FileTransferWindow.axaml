@@ -7,7 +7,7 @@
         mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="250"
         x:Class="LazyChat.Views.FileTransferWindow"
         x:DataType="vm:FileTransferViewModel"
-        Title="文件传输"
+        Title="鏂囦欢浼犺緭"
         Width="450" Height="250"
         CanResize="False"
         WindowStartupLocation="CenterOwner">
@@ -34,15 +34,15 @@
         <StackPanel Orientation="Horizontal" 
                     HorizontalAlignment="Center" 
                     Spacing="10">
-            <Button Content="接受" 
+            <Button Content="鎺ュ彈" 
                     Command="{Binding AcceptCommand}"
                     IsVisible="{Binding ShowAcceptReject}"
                     MinWidth="100"/>
-            <Button Content="拒绝" 
+            <Button Content="鎷掔粷" 
                     Command="{Binding RejectCommand}"
                     IsVisible="{Binding ShowAcceptReject}"
                     MinWidth="100"/>
-            <Button Content="关闭" 
+            <Button Content="鍏抽棴" 
                     Command="{Binding CloseCommand}"
                     IsVisible="{Binding ShowClose}"
                     MinWidth="100"/>
