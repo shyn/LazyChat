@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="LazyChat.Tests/LazyChat.Tests.csproj" />
+  <Project Path="LazyChat/LazyChat.csproj" Id="59deb80b-c973-473d-8046-747310548efc" />
+</Solution>

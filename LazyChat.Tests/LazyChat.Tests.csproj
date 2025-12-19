@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RestoreSources>https://api.nuget.org/v3/index.json</RestoreSources>
+    <RestoreConfigFile>$(MSBuildThisFileDirectory)..\NuGet.Config</RestoreConfigFile>
+    
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    
+    <AssemblyName>LazyChat.Tests</AssemblyName>
+    <RootNamespace>LazyChat.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- NUnit Test Framework - upgraded to 4.2.2 -->
+    <PackageReference Include="NUnit" Version="4.2.2" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    
+    <!-- Mocking Framework - updated to latest -->
+    <PackageReference Include="Moq" Version="4.20.72" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reference to main project -->
+    <ProjectReference Include="..\LazyChat\LazyChat.csproj" />
+  </ItemGroup>
+</Project>

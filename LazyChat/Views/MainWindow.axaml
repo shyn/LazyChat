@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:LazyChat.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="1024" d:DesignHeight="620"
+        x:Class="LazyChat.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="局域网聊天 - LazyChat"
+        Width="1024" Height="620"
+        MinWidth="800" MinHeight="600">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <DockPanel>
+        <!-- Menu Bar -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="文件(_F)">
+                <MenuItem Header="设置用户名(_U)" Command="{Binding SetUsernameCommand}"/>
+                <Separator/>
+                <MenuItem Header="退出(_X)" Command="{Binding ExitCommand}"/>
+            </MenuItem>
+            <MenuItem Header="帮助(_H)">
+                <MenuItem Header="关于(_A)" Command="{Binding AboutCommand}"/>
+            </MenuItem>
+        </Menu>
+
+        <!-- Status Bar -->
+        <Border DockPanel.Dock="Bottom" Background="#F0F0F0" Padding="5" BorderBrush="#D0D0D0" BorderThickness="0,1,0,0">
+            <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center"/>
+        </Border>
+
+        <!-- Main Content -->
+        <Grid ColumnDefinitions="250,*">
+            <!-- Left Panel - User List -->
+            <Border Grid.Column="0" BorderBrush="#D0D0D0" BorderThickness="0,0,1,0">
+                <DockPanel>
+                    <Border DockPanel.Dock="Top" Background="#F8F8F8" Padding="10">
+                        <TextBlock Text="{Binding UserListHeader}" FontWeight="Bold" FontSize="14"/>
+                    </Border>
+                    <ListBox ItemsSource="{Binding OnlinePeers}"
+                             SelectedItem="{Binding SelectedPeer}"
+                             Background="White">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Vertical" Margin="5">
+                                    <TextBlock Text="{Binding UserName}" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding IpAddressString}" FontSize="11" Foreground="Gray"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- Right Panel - Chat Area -->
+            <DockPanel Grid.Column="1">
+                <!-- Chat Header -->
+                <Border DockPanel.Dock="Top" Background="#F8F8F8" Padding="10" BorderBrush="#D0D0D0" BorderThickness="0,0,0,1">
+                    <TextBlock Text="{Binding ChatHeaderText}" FontWeight="Bold" FontSize="14"/>
+                </Border>
+
+                <!-- Input Area -->
+                <Border DockPanel.Dock="Bottom" Padding="10" BorderBrush="#D0D0D0" BorderThickness="0,1,0,0">
+                    <DockPanel>
+                        <!-- Message Input -->
+                        <TextBox DockPanel.Dock="Top"
+                                 Text="{Binding MessageText}"
+                                 Watermark="输入消息... (Ctrl+Enter 发送)"
+                                 AcceptsReturn="True"
+                                 MinHeight="50"
+                                 MaxHeight="100"
+                                 TextWrapping="Wrap"
+                                 Margin="0,0,0,10"/>
+                        
+                        <!-- Buttons -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="5">
+                            <Button Content="图片(_I)" Command="{Binding AttachImageCommand}" MinWidth="80"/>
+                            <Button Content="文件(_F)" Command="{Binding AttachFileCommand}" MinWidth="80"/>
+                            <Button Content="发送(_S)" Command="{Binding SendMessageCommand}" MinWidth="80" 
+                                    Classes="accent"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- Messages Area -->
+                <ScrollViewer Background="White" Padding="10">
+                    <ItemsControl ItemsSource="{Binding Messages}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,5" Padding="10" CornerRadius="5"
+                                        Background="{Binding BubbleBackground}"
+                                        HorizontalAlignment="{Binding BubbleAlignment}">
+                                    <StackPanel Spacing="5">
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <TextBlock Text="{Binding SenderName}" FontWeight="Bold" 
+                                                       Foreground="{Binding SenderColor}"/>
+                                            <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss}'}" 
+                                                       FontSize="11" Foreground="Gray"/>
+                                        </StackPanel>
+                                        
+                                        <!-- Text Message -->
+                                        <TextBlock Text="{Binding TextContent}" TextWrapping="Wrap" 
+                                                   IsVisible="{Binding IsTextMessage}"/>
+                                        
+                                        <!-- Image Message -->
+                                        <Image Source="{Binding ImageBitmap}" MaxWidth="300" MaxHeight="300" 
+                                               IsVisible="{Binding IsImageMessage}"/>
+                                        
+                                        <!-- File Message -->
+                                        <TextBlock Text="{Binding FileDisplayText}" Foreground="Blue" 
+                                                   TextDecorations="Underline" IsVisible="{Binding IsFileMessage}"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Grid>
+    </DockPanel>
+</Window>

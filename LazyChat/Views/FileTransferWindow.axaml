@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:LazyChat.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="250"
+        x:Class="LazyChat.Views.FileTransferWindow"
+        x:DataType="vm:FileTransferViewModel"
+        Title="文件传输"
+        Width="450" Height="250"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner">
+
+    <Design.DataContext>
+        <vm:FileTransferViewModel/>
+    </Design.DataContext>
+
+    <StackPanel Margin="20" Spacing="15">
+        <TextBlock Text="{Binding InfoText}" FontSize="14" TextWrapping="Wrap"/>
+        
+        <StackPanel Spacing="5">
+            <TextBlock Text="{Binding FileNameText}"/>
+            <TextBlock Text="{Binding FileSizeText}"/>
+        </StackPanel>
+
+        <ProgressBar Value="{Binding Progress}" 
+                     IsVisible="{Binding ShowProgress}"
+                     Height="25"/>
+
+        <TextBlock Text="{Binding ProgressText}" 
+                   IsVisible="{Binding ShowProgress}"/>
+
+        <StackPanel Orientation="Horizontal" 
+                    HorizontalAlignment="Center" 
+                    Spacing="10">
+            <Button Content="接受" 
+                    Command="{Binding AcceptCommand}"
+                    IsVisible="{Binding ShowAcceptReject}"
+                    MinWidth="100"/>
+            <Button Content="拒绝" 
+                    Command="{Binding RejectCommand}"
+                    IsVisible="{Binding ShowAcceptReject}"
+                    MinWidth="100"/>
+            <Button Content="关闭" 
+                    Command="{Binding CloseCommand}"
+                    IsVisible="{Binding ShowClose}"
+                    MinWidth="100"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
