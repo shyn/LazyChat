@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Net.NetworkInformation;
 using System.Threading;
 using LazyChat.Models;
 using LazyChat.Services.Interfaces;
@@ -20,6 +21,7 @@ namespace LazyChat.Services
         private const int PEER_TIMEOUT = 15000;
 
         private UdpClient _udpClient;
+        private UdpClient _broadcastClient;
         private Thread _listenThread;
         private Thread _broadcastThread;
         private bool _isRunning;
@@ -28,6 +30,7 @@ namespace LazyChat.Services
         private PeerInfo _localPeer;
         private readonly ILogger _logger;
         private readonly INetworkAdapter _networkAdapter;
+        private IPAddress _subnetBroadcastAddress;
 
         public event EventHandler<PeerInfo> PeerDiscovered;
         public event EventHandler<PeerInfo> PeerLeft;
@@ -65,7 +68,10 @@ namespace LazyChat.Services
                 IpAddress = _networkAdapter.GetLocalIPAddress()
             };
 
+            // Calculate subnet broadcast address for macOS/Linux compatibility
+            _subnetBroadcastAddress = GetSubnetBroadcastAddress(_localPeer.IpAddress);
             _logger.LogInfo($"PeerDiscoveryService initialized for user '{userName}' on port {listeningPort}");
+            _logger.LogInfo($"Local IP: {_localPeer.IpAddress}, Broadcast address: {_subnetBroadcastAddress}");
         }
 
         public void Start()
@@ -79,8 +85,17 @@ namespace LazyChat.Services
             try
             {
                 _isRunning = true;
-                _udpClient = new UdpClient(DISCOVERY_PORT);
-                _udpClient.EnableBroadcast = true;
+                // listener socket
+                _udpClient = new UdpClient(DISCOVERY_PORT)
+                {
+                    EnableBroadcast = true
+                };
+
+                // dedicated sender socket bound to an ephemeral port to avoid "Can't assign requested address"
+                _broadcastClient = new UdpClient
+                {
+                    EnableBroadcast = true
+                };
 
                 _listenThread = new Thread(ListenForPeers)
                 {
@@ -102,7 +117,7 @@ namespace LazyChat.Services
             {
                 _isRunning = false;
                 _logger.LogError("Failed to start discovery service", ex);
-                OnErrorOccurred("∆Ù∂Ø∑¢œ÷∑˛ŒÒ ß∞‹: " + ex.Message);
+                OnErrorOccurred("ÂêØÂä®ÂèëÁé∞ÊúçÂä°Â§±Ë¥•: " + ex.Message);
                 throw new PeerDiscoveryException("Failed to start discovery service", ex);
             }
         }
@@ -123,6 +138,12 @@ namespace LazyChat.Services
                 {
                     _udpClient.Close();
                     _udpClient = null;
+                }
+
+                if (_broadcastClient != null)
+                {
+                    _broadcastClient.Close();
+                    _broadcastClient = null;
                 }
 
                 if (_listenThread != null && _listenThread.IsAlive)
@@ -176,7 +197,7 @@ namespace LazyChat.Services
                     if (_isRunning)
                     {
                         _logger.LogError("Error receiving discovery message", ex);
-                        OnErrorOccurred("Ω” ’∑¢œ÷œ˚œ¢ ß∞‹: " + ex.Message);
+                        OnErrorOccurred("ÔøΩÔøΩÔøΩ’∑ÔøΩÔøΩÔøΩÔøΩÔøΩœ¢ ßÔøΩÔøΩ: " + ex.Message);
                     }
                 }
             }
@@ -252,19 +273,27 @@ namespace LazyChat.Services
                     };
 
                     byte[] data = message.Serialize();
-                    IPEndPoint broadcastEndPoint = new IPEndPoint(IPAddress.Broadcast, DISCOVERY_PORT);
-                    _udpClient.Send(data, data.Length, broadcastEndPoint);
+                    IPEndPoint broadcastEndPoint = new IPEndPoint(_subnetBroadcastAddress, DISCOVERY_PORT);
+                    _broadcastClient.Send(data, data.Length, broadcastEndPoint);
 
                     CheckPeerTimeouts();
 
                     Thread.Sleep(BROADCAST_INTERVAL);
+                }
+                catch (SocketException sex)
+                {
+                    if (_isRunning)
+                    {
+                        _logger.LogError("Broadcast failed (socket)", sex);
+                        OnErrorOccurred("Broadcast failed: " + sex.Message);
+                    }
                 }
                 catch (Exception ex)
                 {
                     if (_isRunning)
                     {
                         _logger.LogError("Broadcast failed", ex);
-                        OnErrorOccurred("π„≤• ß∞‹: " + ex.Message);
+                        OnErrorOccurred("Broadcast failed: " + ex.Message);
                     }
                 }
             }
@@ -292,6 +321,7 @@ namespace LazyChat.Services
             catch (Exception ex)
             {
                 _logger.LogError($"Failed to send discovery response to {targetIp}", ex);
+                OnErrorOccurred($"Send discovery response failed: {ex.Message}");
             }
         }
 
@@ -307,8 +337,9 @@ namespace LazyChat.Services
                 };
 
                 byte[] data = message.Serialize();
-                IPEndPoint broadcastEndPoint = new IPEndPoint(IPAddress.Broadcast, DISCOVERY_PORT);
-                _udpClient.Send(data, data.Length, broadcastEndPoint);
+                IPEndPoint broadcastEndPoint = new IPEndPoint(_subnetBroadcastAddress, DISCOVERY_PORT);
+                var sender = _broadcastClient ?? _udpClient;
+                sender?.Send(data, data.Length, broadcastEndPoint);
                 _logger.LogDebug("Sent goodbye message");
             }
             catch (Exception ex)
@@ -371,10 +402,74 @@ namespace LazyChat.Services
             ErrorOccurred?.Invoke(this, error);
         }
 
+        /// <summary>
+        /// Calculates the subnet broadcast address for the given IP address.
+        /// This is needed for macOS/Linux which don't support 255.255.255.255 broadcasts well.
+        /// </summary>
+        private IPAddress GetSubnetBroadcastAddress(IPAddress localIp)
+        {
+            try
+            {
+                // Find the network interface that has this IP
+                foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (ni.OperationalStatus != OperationalStatus.Up)
+                        continue;
+
+                    foreach (UnicastIPAddressInformation unicast in ni.GetIPProperties().UnicastAddresses)
+                    {
+                        if (unicast.Address.AddressFamily == AddressFamily.InterNetwork &&
+                            unicast.Address.Equals(localIp))
+                        {
+                            // Found the interface, calculate broadcast address
+                            byte[] ipBytes = localIp.GetAddressBytes();
+                            byte[] maskBytes = unicast.IPv4Mask.GetAddressBytes();
+                            byte[] broadcastBytes = new byte[4];
+
+                            for (int i = 0; i < 4; i++)
+                            {
+                                broadcastBytes[i] = (byte)(ipBytes[i] | ~maskBytes[i]);
+                            }
+
+                            IPAddress broadcastAddress = new IPAddress(broadcastBytes);
+                            _logger.LogDebug($"Calculated broadcast address: {broadcastAddress} (mask: {unicast.IPv4Mask})");
+                            return broadcastAddress;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Failed to calculate subnet broadcast address: {ex.Message}");
+            }
+
+            // Fallback: assume /24 subnet (most common for home networks)
+            try
+            {
+                byte[] ipBytes = localIp.GetAddressBytes();
+                ipBytes[3] = 255; // x.x.x.255
+                IPAddress fallbackBroadcast = new IPAddress(ipBytes);
+                _logger.LogDebug($"Using fallback broadcast address: {fallbackBroadcast}");
+                return fallbackBroadcast;
+            }
+            catch
+            {
+                // Ultimate fallback
+                _logger.LogWarning("Using 255.255.255.255 as broadcast address (may not work on macOS)");
+                return IPAddress.Broadcast;
+            }
+        }
+
         public void Dispose()
         {
             Stop();
             _logger?.LogInfo("PeerDiscoveryService disposed");
+        }
+
+        // For diagnostics: returns current local IP and whether broadcast client is usable
+        public (IPAddress LocalIp, bool BroadcastAvailable) GetDiagnostics()
+        {
+            return (_localPeer?.IpAddress ?? IPAddress.None, _broadcastClient != null);
         }
     }
 }
