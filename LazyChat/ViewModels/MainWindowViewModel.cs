@@ -75,6 +75,11 @@ namespace LazyChat.ViewModels
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(ChatHeaderText));
                     LoadConversation(value);
+                    
+                    // Update command states
+                    (SendMessageCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                    (AttachImageCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                    (AttachFileCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 }
             }
         }
@@ -101,6 +106,9 @@ namespace LazyChat.ViewModels
                 {
                     _messageText = value;
                     OnPropertyChanged();
+                    
+                    // Update send command state
+                    (SendMessageCommand as RelayCommand)?.RaiseCanExecuteChanged();
                 }
             }
         }
