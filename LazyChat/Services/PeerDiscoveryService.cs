@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Net.NetworkInformation;
 using System.Threading;
+using System.IO;
 using LazyChat.Models;
 using LazyChat.Services.Interfaces;
 using LazyChat.Exceptions;
@@ -13,30 +14,57 @@ namespace LazyChat.Services
 {
     /// <summary>
     /// Peer discovery service using UDP broadcast for automatic peer detection
+    /// Enhanced with multi-interface broadcasting and peer caching for VPN/complex network scenarios
     /// </summary>
     public class PeerDiscoveryService : IPeerDiscoveryService
     {
         private const int DISCOVERY_PORT = 8888;
         private const int BROADCAST_INTERVAL = 5000;
         private const int PEER_TIMEOUT = 15000;
+        private const int UNICAST_PROBE_INTERVAL = 10000; // Probe cached peers every 10s
 
         private UdpClient _udpClient;
-        private UdpClient _broadcastClient;
+        private List<UdpClient> _broadcastClients; // One per interface
+        private List<NetworkInterfaceInfo> _activeInterfaces;
         private Thread _listenThread;
         private Thread _broadcastThread;
         private bool _isRunning;
         private readonly object _peersLock = new object();
         private Dictionary<string, PeerInfo> _discoveredPeers;
+        private Dictionary<string, CachedPeerAddress> _peerCache; // Persistent cache
         private PeerInfo _localPeer;
         private readonly ILogger _logger;
         private readonly INetworkAdapter _networkAdapter;
-        private IPAddress _subnetBroadcastAddress;
+        private string _cacheFilePath;
 
         public event EventHandler<PeerInfo> PeerDiscovered;
         public event EventHandler<PeerInfo> PeerLeft;
         public event EventHandler<string> ErrorOccurred;
 
         public bool IsRunning => _isRunning;
+
+        /// <summary>
+        /// Represents a network interface with its broadcast address
+        /// </summary>
+        private class NetworkInterfaceInfo
+        {
+            public IPAddress LocalAddress { get; set; }
+            public IPAddress BroadcastAddress { get; set; }
+            public string InterfaceName { get; set; }
+        }
+
+        /// <summary>
+        /// Cached peer address for fallback probing
+        /// </summary>
+        [Serializable]
+        private class CachedPeerAddress
+        {
+            public string PeerId { get; set; }
+            public string UserName { get; set; }
+            public string IpAddress { get; set; }
+            public int Port { get; set; }
+            public DateTime LastSeen { get; set; }
+        }
 
         /// <summary>
         /// Creates a new peer discovery service
@@ -60,6 +88,9 @@ namespace LazyChat.Services
             _logger = logger ?? new Infrastructure.FileLogger();
             _networkAdapter = networkAdapter ?? new Infrastructure.NetworkAdapter();
             _discoveredPeers = new Dictionary<string, PeerInfo>();
+            _peerCache = new Dictionary<string, CachedPeerAddress>();
+            _broadcastClients = new List<UdpClient>();
+            _activeInterfaces = new List<NetworkInterfaceInfo>();
             
             _localPeer = new PeerInfo
             {
@@ -68,10 +99,18 @@ namespace LazyChat.Services
                 IpAddress = _networkAdapter.GetLocalIPAddress()
             };
 
-            // Calculate subnet broadcast address for macOS/Linux compatibility
-            _subnetBroadcastAddress = GetSubnetBroadcastAddress(_localPeer.IpAddress);
+            // Setup cache file path
+            string appDataPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "LazyChat");
+            if (!Directory.Exists(appDataPath))
+                Directory.CreateDirectory(appDataPath);
+            _cacheFilePath = Path.Combine(appDataPath, "peer_cache.dat");
+
+            LoadPeerCache();
+
             _logger.LogInfo($"PeerDiscoveryService initialized for user '{userName}' on port {listeningPort}");
-            _logger.LogInfo($"Local IP: {_localPeer.IpAddress}, Broadcast address: {_subnetBroadcastAddress}");
+            _logger.LogInfo($"Primary local IP: {_localPeer.IpAddress}");
         }
 
         public void Start()
@@ -85,17 +124,23 @@ namespace LazyChat.Services
             try
             {
                 _isRunning = true;
-                // listener socket
+
+                // Discover all usable network interfaces
+                DiscoverNetworkInterfaces();
+
+                // listener socket (binds to all interfaces)
                 _udpClient = new UdpClient(DISCOVERY_PORT)
                 {
                     EnableBroadcast = true
                 };
+                // Enable address reuse for multi-instance scenarios
+                _udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 
-                // dedicated sender socket bound to an ephemeral port to avoid "Can't assign requested address"
-                _broadcastClient = new UdpClient
-                {
-                    EnableBroadcast = true
-                };
+                // Create dedicated sender sockets, one per interface
+                CreateBroadcastClients();
+
+                // Probe cached peers immediately on startup
+                ProbeKnownPeers();
 
                 _listenThread = new Thread(ListenForPeers)
                 {
@@ -111,7 +156,7 @@ namespace LazyChat.Services
                 };
                 _broadcastThread.Start();
 
-                _logger.LogInfo("Peer discovery service started successfully");
+                _logger.LogInfo($"Peer discovery service started on {_activeInterfaces.Count} interface(s)");
             }
             catch (Exception ex)
             {
@@ -140,10 +185,13 @@ namespace LazyChat.Services
                     _udpClient = null;
                 }
 
-                if (_broadcastClient != null)
+                if (_broadcastClients != null)
                 {
-                    _broadcastClient.Close();
-                    _broadcastClient = null;
+                    foreach (var client in _broadcastClients)
+                    {
+                        try { client?.Close(); } catch { }
+                    }
+                    _broadcastClients.Clear();
                 }
 
                 if (_listenThread != null && _listenThread.IsAlive)
@@ -155,6 +203,8 @@ namespace LazyChat.Services
                 {
                     _broadcastThread.Join(1000);
                 }
+
+                SavePeerCache();
 
                 _logger.LogInfo("Peer discovery service stopped");
             }
@@ -217,7 +267,7 @@ namespace LazyChat.Services
                     peer = _discoveredPeers[message.SenderId];
                     peer.LastSeen = DateTime.Now;
                 }
-                else if (message.Type == MessageType.Discovery)
+                else if (message.Type == MessageType.Discovery || message.Type == MessageType.DiscoveryResponse)
                 {
                     peer = new PeerInfo
                     {
@@ -231,6 +281,9 @@ namespace LazyChat.Services
                     _discoveredPeers[message.SenderId] = peer;
                     isNewPeer = true;
                     _logger.LogInfo($"New peer discovered: {peer.UserName} ({peer.IpAddress}:{peer.Port})");
+
+                    // Update cache
+                    UpdatePeerCache(peer);
                 }
 
                 if (message.Type == MessageType.Discovery && peer != null)
@@ -259,6 +312,7 @@ namespace LazyChat.Services
         private void BroadcastPresence()
         {
             _logger.LogDebug("Broadcast thread started");
+            int probeCounter = 0;
 
             while (_isRunning)
             {
@@ -273,20 +327,40 @@ namespace LazyChat.Services
                     };
 
                     byte[] data = message.Serialize();
-                    IPEndPoint broadcastEndPoint = new IPEndPoint(_subnetBroadcastAddress, DISCOVERY_PORT);
-                    _broadcastClient.Send(data, data.Length, broadcastEndPoint);
+
+                    // Broadcast on all interfaces
+                    foreach (var iface in _activeInterfaces)
+                    {
+                        try
+                        {
+                            var client = _broadcastClients.FirstOrDefault(c => 
+                                c.Client.LocalEndPoint is IPEndPoint ep && 
+                                ep.Address.Equals(iface.LocalAddress));
+
+                            if (client != null)
+                            {
+                                IPEndPoint broadcastEndPoint = new IPEndPoint(iface.BroadcastAddress, DISCOVERY_PORT);
+                                client.Send(data, data.Length, broadcastEndPoint);
+                                _logger.LogDebug($"Broadcasted on {iface.InterfaceName} to {iface.BroadcastAddress}");
+                            }
+                        }
+                        catch (SocketException sex)
+                        {
+                            _logger.LogDebug($"Broadcast failed on {iface.InterfaceName}: {sex.Message}");
+                        }
+                    }
+
+                    // Periodically probe cached peers (fallback for broadcast failures)
+                    probeCounter++;
+                    if (probeCounter * BROADCAST_INTERVAL >= UNICAST_PROBE_INTERVAL)
+                    {
+                        ProbeKnownPeers();
+                        probeCounter = 0;
+                    }
 
                     CheckPeerTimeouts();
 
                     Thread.Sleep(BROADCAST_INTERVAL);
-                }
-                catch (SocketException sex)
-                {
-                    if (_isRunning)
-                    {
-                        _logger.LogError("Broadcast failed (socket)", sex);
-                        OnErrorOccurred("Broadcast failed: " + sex.Message);
-                    }
                 }
                 catch (Exception ex)
                 {
@@ -337,9 +411,25 @@ namespace LazyChat.Services
                 };
 
                 byte[] data = message.Serialize();
-                IPEndPoint broadcastEndPoint = new IPEndPoint(_subnetBroadcastAddress, DISCOVERY_PORT);
-                var sender = _broadcastClient ?? _udpClient;
-                sender?.Send(data, data.Length, broadcastEndPoint);
+
+                // Send goodbye on all interfaces
+                foreach (var iface in _activeInterfaces)
+                {
+                    try
+                    {
+                        var client = _broadcastClients.FirstOrDefault(c => 
+                            c.Client.LocalEndPoint is IPEndPoint ep && 
+                            ep.Address.Equals(iface.LocalAddress));
+
+                        if (client != null)
+                        {
+                            IPEndPoint broadcastEndPoint = new IPEndPoint(iface.BroadcastAddress, DISCOVERY_PORT);
+                            client.Send(data, data.Length, broadcastEndPoint);
+                        }
+                    }
+                    catch { }
+                }
+
                 _logger.LogDebug("Sent goodbye message");
             }
             catch (Exception ex)
@@ -403,60 +493,278 @@ namespace LazyChat.Services
         }
 
         /// <summary>
-        /// Calculates the subnet broadcast address for the given IP address.
-        /// This is needed for macOS/Linux which don't support 255.255.255.255 broadcasts well.
+        /// Discovers all usable network interfaces and calculates their broadcast addresses
+        /// Filters out VPN/virtual/tunnel interfaces to prioritize physical LAN connections
         /// </summary>
-        private IPAddress GetSubnetBroadcastAddress(IPAddress localIp)
+        private void DiscoverNetworkInterfaces()
         {
+            _activeInterfaces.Clear();
+            
             try
             {
-                // Find the network interface that has this IP
                 foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
                 {
+                    // Skip non-operational, loopback, and tunnel/VPN interfaces
                     if (ni.OperationalStatus != OperationalStatus.Up)
                         continue;
 
-                    foreach (UnicastIPAddressInformation unicast in ni.GetIPProperties().UnicastAddresses)
+                    if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback ||
+                        ni.NetworkInterfaceType == NetworkInterfaceType.Tunnel)
+                        continue;
+
+                    // Heuristic: skip interfaces with VPN-like names (common on Windows/macOS)
+                    string name = ni.Name.ToLowerInvariant();
+                    if (name.Contains("vpn") || name.Contains("virtual") || 
+                        name.Contains("tun") || name.Contains("tap") ||
+                        name.Contains("utun") || name.Contains("ppp"))
                     {
-                        if (unicast.Address.AddressFamily == AddressFamily.InterNetwork &&
-                            unicast.Address.Equals(localIp))
-                        {
-                            // Found the interface, calculate broadcast address
-                            byte[] ipBytes = localIp.GetAddressBytes();
-                            byte[] maskBytes = unicast.IPv4Mask.GetAddressBytes();
-                            byte[] broadcastBytes = new byte[4];
-
-                            for (int i = 0; i < 4; i++)
-                            {
-                                broadcastBytes[i] = (byte)(ipBytes[i] | ~maskBytes[i]);
-                            }
-
-                            IPAddress broadcastAddress = new IPAddress(broadcastBytes);
-                            _logger.LogDebug($"Calculated broadcast address: {broadcastAddress} (mask: {unicast.IPv4Mask})");
-                            return broadcastAddress;
-                        }
+                        _logger.LogDebug($"Skipping VPN/virtual interface: {ni.Name}");
+                        continue;
                     }
+
+                    var ipProps = ni.GetIPProperties();
+                    foreach (UnicastIPAddressInformation unicast in ipProps.UnicastAddresses)
+                    {
+                        if (unicast.Address.AddressFamily != AddressFamily.InterNetwork)
+                            continue;
+
+                        if (IPAddress.IsLoopback(unicast.Address))
+                            continue;
+
+                        // Calculate broadcast address
+                        IPAddress broadcastAddr = CalculateBroadcastAddress(unicast.Address, unicast.IPv4Mask);
+                        
+                        var ifaceInfo = new NetworkInterfaceInfo
+                        {
+                            LocalAddress = unicast.Address,
+                            BroadcastAddress = broadcastAddr,
+                            InterfaceName = ni.Name
+                        };
+
+                        _activeInterfaces.Add(ifaceInfo);
+                        _logger.LogInfo($"Active interface: {ni.Name} - {unicast.Address} (broadcast: {broadcastAddr})");
+                    }
+                }
+
+                if (_activeInterfaces.Count == 0)
+                {
+                    _logger.LogWarning("No usable network interfaces found, using fallback");
+                    // Fallback: use primary adapter
+                    var fallbackAddr = _localPeer.IpAddress;
+                    _activeInterfaces.Add(new NetworkInterfaceInfo
+                    {
+                        LocalAddress = fallbackAddr,
+                        BroadcastAddress = GetFallbackBroadcast(fallbackAddr),
+                        InterfaceName = "Fallback"
+                    });
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning($"Failed to calculate subnet broadcast address: {ex.Message}");
+                _logger.LogError("Failed to discover network interfaces", ex);
+                // Fallback
+                _activeInterfaces.Add(new NetworkInterfaceInfo
+                {
+                    LocalAddress = _localPeer.IpAddress,
+                    BroadcastAddress = GetFallbackBroadcast(_localPeer.IpAddress),
+                    InterfaceName = "Fallback"
+                });
+            }
+        }
+
+        /// <summary>
+        /// Creates dedicated UDP clients for broadcasting, one per interface
+        /// Each client is bound to a specific local address to ensure packets go out the right interface
+        /// </summary>
+        private void CreateBroadcastClients()
+        {
+            foreach (var iface in _activeInterfaces)
+            {
+                try
+                {
+                    var client = new UdpClient(new IPEndPoint(iface.LocalAddress, 0))
+                    {
+                        EnableBroadcast = true
+                    };
+                    _broadcastClients.Add(client);
+                    _logger.LogDebug($"Created broadcast client for {iface.LocalAddress}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning($"Failed to create broadcast client for {iface.LocalAddress}: {ex.Message}");
+                }
             }
 
-            // Fallback: assume /24 subnet (most common for home networks)
+            if (_broadcastClients.Count == 0)
+            {
+                _logger.LogWarning("No broadcast clients created, creating unbound fallback");
+                _broadcastClients.Add(new UdpClient { EnableBroadcast = true });
+            }
+        }
+
+        /// <summary>
+        /// Calculates broadcast address from IP and subnet mask
+        /// </summary>
+        private IPAddress CalculateBroadcastAddress(IPAddress ip, IPAddress mask)
+        {
+            if (mask == null)
+                return GetFallbackBroadcast(ip);
+
             try
             {
-                byte[] ipBytes = localIp.GetAddressBytes();
-                ipBytes[3] = 255; // x.x.x.255
-                IPAddress fallbackBroadcast = new IPAddress(ipBytes);
-                _logger.LogDebug($"Using fallback broadcast address: {fallbackBroadcast}");
-                return fallbackBroadcast;
+                byte[] ipBytes = ip.GetAddressBytes();
+                byte[] maskBytes = mask.GetAddressBytes();
+                byte[] broadcastBytes = new byte[4];
+
+                for (int i = 0; i < 4; i++)
+                {
+                    broadcastBytes[i] = (byte)(ipBytes[i] | ~maskBytes[i]);
+                }
+
+                return new IPAddress(broadcastBytes);
             }
             catch
             {
-                // Ultimate fallback
-                _logger.LogWarning("Using 255.255.255.255 as broadcast address (may not work on macOS)");
+                return GetFallbackBroadcast(ip);
+            }
+        }
+
+        /// <summary>
+        /// Fallback broadcast calculation (assumes /24)
+        /// </summary>
+        private IPAddress GetFallbackBroadcast(IPAddress ip)
+        {
+            try
+            {
+                byte[] ipBytes = ip.GetAddressBytes();
+                ipBytes[3] = 255; // x.x.x.255
+                return new IPAddress(ipBytes);
+            }
+            catch
+            {
                 return IPAddress.Broadcast;
+            }
+        }
+
+        /// <summary>
+        /// Probes known peers from cache with unicast messages (fallback for broadcast failures)
+        /// </summary>
+        private void ProbeKnownPeers()
+        {
+            if (_peerCache.Count == 0)
+                return;
+
+            _logger.LogDebug($"Probing {_peerCache.Count} cached peer(s)");
+
+            NetworkMessage message = new NetworkMessage
+            {
+                Type = MessageType.Discovery,
+                SenderId = _localPeer.PeerId,
+                SenderName = _localPeer.UserName,
+                TextContent = _localPeer.Port.ToString()
+            };
+
+            byte[] data = message.Serialize();
+
+            foreach (var cached in _peerCache.Values.ToList())
+            {
+                // Skip if already discovered
+                if (_discoveredPeers.ContainsKey(cached.PeerId))
+                    continue;
+
+                try
+                {
+                    IPAddress targetIp = IPAddress.Parse(cached.IpAddress);
+                    IPEndPoint endPoint = new IPEndPoint(targetIp, DISCOVERY_PORT);
+
+                    // Send unicast probe
+                    _udpClient?.Send(data, data.Length, endPoint);
+                    _logger.LogDebug($"Probed cached peer {cached.UserName} at {cached.IpAddress}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug($"Failed to probe {cached.IpAddress}: {ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Updates peer cache with newly discovered peer
+        /// </summary>
+        private void UpdatePeerCache(PeerInfo peer)
+        {
+            _peerCache[peer.PeerId] = new CachedPeerAddress
+            {
+                PeerId = peer.PeerId,
+                UserName = peer.UserName,
+                IpAddress = peer.IpAddress.ToString(),
+                Port = peer.Port,
+                LastSeen = DateTime.Now
+            };
+        }
+
+        /// <summary>
+        /// Loads peer cache from disk
+        /// </summary>
+        private void LoadPeerCache()
+        {
+            try
+            {
+                if (!File.Exists(_cacheFilePath))
+                    return;
+
+                using (var reader = new StreamReader(_cacheFilePath))
+                {
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        var parts = line.Split('|');
+                        if (parts.Length >= 4)
+                        {
+                            var cached = new CachedPeerAddress
+                            {
+                                PeerId = parts[0],
+                                UserName = parts[1],
+                                IpAddress = parts[2],
+                                Port = int.Parse(parts[3]),
+                                LastSeen = parts.Length > 4 ? DateTime.Parse(parts[4]) : DateTime.Now
+                            };
+                            _peerCache[cached.PeerId] = cached;
+                        }
+                    }
+                }
+                _logger.LogInfo($"Loaded {_peerCache.Count} peer(s) from cache");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Failed to load peer cache: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Saves peer cache to disk
+        /// </summary>
+        private void SavePeerCache()
+        {
+            try
+            {
+                // Only keep peers seen in the last 7 days
+                var recentPeers = _peerCache.Values
+                    .Where(p => (DateTime.Now - p.LastSeen).TotalDays < 7)
+                    .ToList();
+
+                using (var writer = new StreamWriter(_cacheFilePath, false))
+                {
+                    foreach (var peer in recentPeers)
+                    {
+                        writer.WriteLine($"{peer.PeerId}|{peer.UserName}|{peer.IpAddress}|{peer.Port}|{peer.LastSeen:O}");
+                    }
+                }
+                _logger.LogDebug($"Saved {recentPeers.Count} peer(s) to cache");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Failed to save peer cache: {ex.Message}");
             }
         }
 
@@ -466,10 +774,14 @@ namespace LazyChat.Services
             _logger?.LogInfo("PeerDiscoveryService disposed");
         }
 
-        // For diagnostics: returns current local IP and whether broadcast client is usable
-        public (IPAddress LocalIp, bool BroadcastAvailable) GetDiagnostics()
+        // For diagnostics: returns current local IP and interface info
+        public (IPAddress LocalIp, bool BroadcastAvailable, int InterfaceCount) GetDiagnostics()
         {
-            return (_localPeer?.IpAddress ?? IPAddress.None, _broadcastClient != null);
+            return (
+                _localPeer?.IpAddress ?? IPAddress.None, 
+                _broadcastClients != null && _broadcastClients.Count > 0,
+                _activeInterfaces?.Count ?? 0
+            );
         }
     }
 }
