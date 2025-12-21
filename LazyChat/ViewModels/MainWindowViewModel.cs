@@ -149,8 +149,11 @@ namespace LazyChat.ViewModels
 
         private void InitializeServices()
         {
-            _commService = new P2PCommunicationService(COMMUNICATION_PORT, Guid.NewGuid().ToString());
+            // 先初始化发现服务，获取本机 PeerId，确保通信与发现使用同一 PeerId
             _discoveryService = new PeerDiscoveryService(_userName, COMMUNICATION_PORT);
+            var localPeerId = _discoveryService.GetLocalPeer().PeerId;
+
+            _commService = new P2PCommunicationService(COMMUNICATION_PORT, localPeerId);
             _fileTransferService = new FileTransferService(_commService);
 
             _discoveryService.PeerDiscovered += DiscoveryService_PeerDiscovered;
