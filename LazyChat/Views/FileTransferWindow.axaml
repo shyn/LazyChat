@@ -4,48 +4,84 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:LazyChat.ViewModels"
-        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="250"
+        mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="280"
         x:Class="LazyChat.Views.FileTransferWindow"
         x:DataType="vm:FileTransferViewModel"
         Title="文件传输"
-        Width="450" Height="250"
+        Width="480" Height="280"
         CanResize="False"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        Background="#FAFBFC">
 
     <Design.DataContext>
         <vm:FileTransferViewModel/>
     </Design.DataContext>
 
-    <StackPanel Margin="20" Spacing="15">
-        <TextBlock Text="{Binding InfoText}" FontSize="14" TextWrapping="Wrap"/>
-        
-        <StackPanel Spacing="5">
-            <TextBlock Text="{Binding FileNameText}"/>
-            <TextBlock Text="{Binding FileSizeText}"/>
+    <Border Padding="28">
+        <StackPanel Spacing="20">
+            <!-- Header with icon -->
+            <StackPanel Orientation="Horizontal" Spacing="16">
+                <Border Width="56" Height="56"
+                        CornerRadius="12"
+                        Background="#F0F5FF">
+                    <TextBlock Text="📄"
+                               FontSize="28"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                </Border>
+                <StackPanel VerticalAlignment="Center" Spacing="4">
+                    <TextBlock Text="{Binding FileNameText}" 
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               Foreground="#1D1D1F"
+                               TextTrimming="CharacterEllipsis"
+                               MaxWidth="340"/>
+                    <TextBlock Text="{Binding FileSizeText}"
+                               FontSize="13"
+                               Foreground="#86868B"/>
+                </StackPanel>
+            </StackPanel>
+            
+            <!-- Info text -->
+            <TextBlock Text="{Binding InfoText}" 
+                       FontSize="14" 
+                       TextWrapping="Wrap"
+                       Foreground="#1D1D1F"/>
+
+            <!-- Progress Section -->
+            <StackPanel Spacing="8" IsVisible="{Binding ShowProgress}">
+                <ProgressBar Value="{Binding Progress}" 
+                             Height="8"
+                             CornerRadius="4"
+                             Background="#E5E5EA"
+                             Foreground="#0A84FF"/>
+                <TextBlock Text="{Binding ProgressText}" 
+                           FontSize="13"
+                           Foreground="#86868B"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Buttons -->
+            <StackPanel Orientation="Horizontal" 
+                        HorizontalAlignment="Center" 
+                        Spacing="12"
+                        Margin="0,8,0,0">
+                <Button Content="拒绝" 
+                        Command="{Binding RejectCommand}"
+                        IsVisible="{Binding ShowAcceptReject}"
+                        Classes="secondary"
+                        MinWidth="110"/>
+                <Button Content="接受" 
+                        Command="{Binding AcceptCommand}"
+                        IsVisible="{Binding ShowAcceptReject}"
+                        Classes="primary"
+                        MinWidth="110"/>
+                <Button Content="关闭" 
+                        Command="{Binding CloseCommand}"
+                        IsVisible="{Binding ShowClose}"
+                        Classes="secondary"
+                        MinWidth="110"/>
+            </StackPanel>
         </StackPanel>
-
-        <ProgressBar Value="{Binding Progress}" 
-                     IsVisible="{Binding ShowProgress}"
-                     Height="25"/>
-
-        <TextBlock Text="{Binding ProgressText}" 
-                   IsVisible="{Binding ShowProgress}"/>
-
-        <StackPanel Orientation="Horizontal" 
-                    HorizontalAlignment="Center" 
-                    Spacing="10">
-            <Button Content="接受" 
-                    Command="{Binding AcceptCommand}"
-                    IsVisible="{Binding ShowAcceptReject}"
-                    MinWidth="100"/>
-            <Button Content="拒绝" 
-                    Command="{Binding RejectCommand}"
-                    IsVisible="{Binding ShowAcceptReject}"
-                    MinWidth="100"/>
-            <Button Content="关闭" 
-                    Command="{Binding CloseCommand}"
-                    IsVisible="{Binding ShowClose}"
-                    MinWidth="100"/>
-        </StackPanel>
-    </StackPanel>
+    </Border>
 </Window>

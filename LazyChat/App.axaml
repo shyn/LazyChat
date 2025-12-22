@@ -2,8 +2,64 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="LazyChat.App"
-             RequestedThemeVariant="Default">
+             RequestedThemeVariant="Light">
     <Application.Styles>
         <FluentTheme />
+        
+        <Style Selector="Window">
+            <Setter Property="Background" Value="#FAFBFC"/>
+        </Style>
+        
+        <!-- Modern Button Styles -->
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="#0A84FF"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#0070E0"/>
+        </Style>
+        <Style Selector="Button.primary:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="#005CBB"/>
+        </Style>
+        
+        <Style Selector="Button.secondary">
+            <Setter Property="Background" Value="#F0F1F3"/>
+            <Setter Property="Foreground" Value="#1D1D1F"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="16,8"/>
+        </Style>
+        <Style Selector="Button.secondary:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#E5E5EA"/>
+        </Style>
+        
+        <Style Selector="Button.icon">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
+        <Style Selector="Button.icon:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#F0F1F3"/>
+        </Style>
+        
+        <!-- Modern TextBox -->
+        <Style Selector="TextBox.modern">
+            <Setter Property="Background" Value="#F5F5F7"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="14,12"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+        <Style Selector="TextBox.modern:focus">
+            <Setter Property="Background" Value="#EBEBED"/>
+        </Style>
+        
+        <!-- Scrollbar styling -->
+        <Style Selector="ScrollViewer">
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+        </Style>
+        
     </Application.Styles>
 </Application>

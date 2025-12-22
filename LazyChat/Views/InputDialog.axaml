@@ -4,34 +4,49 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:LazyChat.ViewModels"
-        mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="180"
+        mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="220"
         x:Class="LazyChat.Views.InputDialog"
         x:DataType="vm:InputDialogViewModel"
         Title="{Binding Title}"
-        Width="400" Height="180"
+        Width="420" Height="220"
         CanResize="False"
-        WindowStartupLocation="CenterOwner">
+        WindowStartupLocation="CenterOwner"
+        Background="#FAFBFC">
 
     <Design.DataContext>
         <vm:InputDialogViewModel/>
     </Design.DataContext>
 
-    <StackPanel Margin="20" Spacing="15">
-        <TextBlock Text="{Binding Prompt}" TextWrapping="Wrap"/>
-        
-        <TextBox Text="{Binding InputText}" Watermark="请输入..."/>
+    <Border Padding="28">
+        <StackPanel Spacing="20">
+            <!-- Prompt -->
+            <TextBlock Text="{Binding Prompt}" 
+                       TextWrapping="Wrap"
+                       FontSize="15"
+                       Foreground="#1D1D1F"/>
+            
+            <!-- Input -->
+            <TextBox Text="{Binding InputText}" 
+                     Watermark="请输入..."
+                     Classes="modern"
+                     FontSize="15"/>
 
-        <StackPanel Orientation="Horizontal" 
-                    HorizontalAlignment="Right" 
-                    Spacing="10">
-            <Button Content="确定" 
-                    Command="{Binding OkCommand}"
-                    MinWidth="80" 
-                    IsDefault="True"/>
-            <Button Content="取消" 
-                    Command="{Binding CancelCommand}"
-                    MinWidth="80" 
-                    IsCancel="True"/>
+            <!-- Buttons -->
+            <StackPanel Orientation="Horizontal" 
+                        HorizontalAlignment="Right" 
+                        Spacing="12"
+                        Margin="0,8,0,0">
+                <Button Content="取消" 
+                        Command="{Binding CancelCommand}"
+                        Classes="secondary"
+                        MinWidth="90" 
+                        IsCancel="True"/>
+                <Button Content="确定" 
+                        Command="{Binding OkCommand}"
+                        Classes="primary"
+                        MinWidth="90" 
+                        IsDefault="True"/>
+            </StackPanel>
         </StackPanel>
-    </StackPanel>
+    </Border>
 </Window>

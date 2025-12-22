@@ -157,8 +157,12 @@ namespace LazyChat.Models
     }
 
     [MessagePackObject]
-    public class PeerInfo
+    public class PeerInfo : System.ComponentModel.INotifyPropertyChanged
     {
+        private int _unreadCount;
+        private bool _isSelected;
+        private string _initial;
+
         [Key(0)]
         public string PeerId { get; set; }
         
@@ -183,6 +187,48 @@ namespace LazyChat.Models
             get => string.IsNullOrEmpty(IpAddressString) ? null : IPAddress.Parse(IpAddressString);
             set => IpAddressString = value?.ToString();
         }
+
+        // UI properties
+        [IgnoreMember]
+        public int UnreadCount
+        {
+            get => _unreadCount;
+            set
+            {
+                if (_unreadCount != value)
+                {
+                    _unreadCount = value;
+                    PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(UnreadCount)));
+                    PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(HasUnread)));
+                }
+            }
+        }
+
+        [IgnoreMember]
+        public bool HasUnread => _unreadCount > 0;
+
+        [IgnoreMember]
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected != value)
+                {
+                    _isSelected = value;
+                    PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsSelected)));
+                }
+            }
+        }
+
+        [IgnoreMember]
+        public string Initial
+        {
+            get => _initial ?? (string.IsNullOrWhiteSpace(UserName) ? "?" : UserName.Substring(0, 1).ToUpperInvariant());
+            set => _initial = value;
+        }
+
+        public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
 
         public PeerInfo()
         {
