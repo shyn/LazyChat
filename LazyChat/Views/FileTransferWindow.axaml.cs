@@ -27,5 +27,15 @@ namespace LazyChat.Views
         {
             _viewModel?.UpdateProgress(progress);
         }
+
+        public void UpdateInfoText(string text)
+        {
+            _viewModel?.UpdateInfoText(text);
+        }
+
+        public void MarkSending()
+        {
+            _viewModel?.MarkSending();
+        }
     }
 }

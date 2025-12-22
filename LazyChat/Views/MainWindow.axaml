@@ -103,7 +103,11 @@
                                  MinHeight="50"
                                  MaxHeight="100"
                                  TextWrapping="Wrap"
-                                 Margin="0,0,0,10"/>
+                                 Margin="0,0,0,10">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Ctrl+Enter" Command="{Binding SendMessageCommand}"/>
+                            </TextBox.KeyBindings>
+                        </TextBox>
                         
                         <!-- Buttons -->
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="5">
@@ -116,38 +120,44 @@
                 </Border>
 
                 <!-- Messages Area -->
-                <ScrollViewer Background="White" Padding="10">
-                    <ItemsControl ItemsSource="{Binding Messages}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Margin="0,5" Padding="10" CornerRadius="5"
-                                        Background="{Binding BubbleBackground}"
-                                        HorizontalAlignment="{Binding BubbleAlignment}">
-                                    <StackPanel Spacing="5">
-                                        <StackPanel Orientation="Horizontal" Spacing="10">
-                                            <TextBlock Text="{Binding SenderName}" FontWeight="Bold" 
-                                                       Foreground="{Binding SenderColor}"/>
-                                            <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss}'}" 
-                                                       FontSize="11" Foreground="Gray"/>
-                                        </StackPanel>
-                                        
-                                        <!-- Text Message -->
-                                        <TextBlock Text="{Binding TextContent}" TextWrapping="Wrap" 
-                                                   IsVisible="{Binding IsTextMessage}"/>
-                                        
-                                        <!-- Image Message -->
-                                        <Image Source="{Binding ImageBitmap}" MaxWidth="300" MaxHeight="300" 
-                                               IsVisible="{Binding IsImageMessage}"/>
-                                        
-                                        <!-- File Message -->
-                                        <TextBlock Text="{Binding FileDisplayText}" Foreground="Blue" 
-                                                   TextDecorations="Underline" IsVisible="{Binding IsFileMessage}"/>
+                <ListBox Background="White" Padding="10" BorderThickness="0"
+                         ItemsSource="{Binding Messages}"
+                         Focusable="False"
+                         IsHitTestVisible="False">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <VirtualizingStackPanel/>
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,5" Padding="10" CornerRadius="5"
+                                    Background="{Binding BubbleBackground}"
+                                    HorizontalAlignment="{Binding BubbleAlignment}">
+                                <StackPanel Spacing="5">
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Text="{Binding SenderName}" FontWeight="Bold" 
+                                                   Foreground="{Binding SenderColor}"/>
+                                        <TextBlock Text="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss}'}" 
+                                                   FontSize="11" Foreground="Gray"/>
                                     </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+                                    
+                                    <!-- Text Message -->
+                                    <TextBlock Text="{Binding TextContent}" TextWrapping="Wrap" 
+                                               IsVisible="{Binding IsTextMessage}"/>
+                                    
+                                    <!-- Image Message -->
+                                    <Image Source="{Binding ImageBitmap}" MaxWidth="300" MaxHeight="300" 
+                                           IsVisible="{Binding IsImageMessage}"/>
+                                    
+                                    <!-- File Message -->
+                                    <TextBlock Text="{Binding FileDisplayText}" Foreground="Blue" 
+                                               TextDecorations="Underline" IsVisible="{Binding IsFileMessage}"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
             </DockPanel>
         </Grid>
     </DockPanel>

@@ -11,19 +11,32 @@ namespace LazyChat.Services
         private const int CHUNK_SIZE = 65536;
         private Dictionary<string, FileTransferInfo> _activeTransfers;
         private Dictionary<string, FileStream> _activeFileStreams;
+        private Dictionary<string, OutgoingTransferContext> _outgoingTransfers;
         private readonly object _transfersLock = new object();
+        private readonly object _outgoingLock = new object();
         private P2PCommunicationService _commService;
+        private readonly string _localPeerId;
+
+        private class OutgoingTransferContext
+        {
+            public string FilePath { get; set; }
+            public PeerInfo TargetPeer { get; set; }
+            public string SenderName { get; set; }
+        }
 
         public event EventHandler<FileTransferInfo> TransferProgressChanged;
         public event EventHandler<FileTransferInfo> TransferCompleted;
         public event EventHandler<FileTransferInfo> TransferFailed;
         public event EventHandler<FileTransferInfo> TransferRequestReceived;
+        public event EventHandler<FileTransferInfo> TransferStarted;
 
-        public FileTransferService(P2PCommunicationService commService)
+        public FileTransferService(P2PCommunicationService commService, string localPeerId)
         {
             _commService = commService;
+            _localPeerId = localPeerId;
             _activeTransfers = new Dictionary<string, FileTransferInfo>();
             _activeFileStreams = new Dictionary<string, FileStream>();
+            _outgoingTransfers = new Dictionary<string, OutgoingTransferContext>();
         }
 
         public void StartSendingFile(string filePath, PeerInfo targetPeer, string senderName)
@@ -45,7 +58,7 @@ namespace LazyChat.Services
                 {
                     FileName = fileInfo.Name,
                     FileSize = fileInfo.Length,
-                    SenderId = _commService.GetType().Name,
+                    SenderId = _localPeerId,
                     SenderName = senderName,
                     ReceiverId = targetPeer.PeerId
                 };
@@ -54,6 +67,18 @@ namespace LazyChat.Services
                 {
                     _activeTransfers[transfer.FileId] = transfer;
                 }
+
+                lock (_outgoingLock)
+                {
+                    _outgoingTransfers[transfer.FileId] = new OutgoingTransferContext
+                    {
+                        FilePath = filePath,
+                        TargetPeer = targetPeer,
+                        SenderName = senderName
+                    };
+                }
+
+                TransferStarted?.Invoke(this, transfer);
 
                 bool accepted = _commService.SendFileTransferRequest(
                     transfer.FileName,
@@ -65,6 +90,7 @@ namespace LazyChat.Services
                 if (!accepted)
                 {
                     transfer.IsCancelled = true;
+                    RemoveOutgoingTransfer(transfer.FileId);
                     TransferFailed?.Invoke(this, transfer);
                     return;
                 }
@@ -74,6 +100,7 @@ namespace LazyChat.Services
                 if (transfer != null)
                 {
                     transfer.IsCancelled = true;
+                    RemoveOutgoingTransfer(transfer.FileId);
                     TransferFailed?.Invoke(this, transfer);
                 }
             }
@@ -120,6 +147,49 @@ namespace LazyChat.Services
             Thread sendThread = new Thread(() => SendFileChunks(fileId, filePath, targetPeer, senderName));
             sendThread.IsBackground = true;
             sendThread.Start();
+        }
+
+        public void HandleTransferAccepted(string fileId)
+        {
+            OutgoingTransferContext context = null;
+
+            lock (_outgoingLock)
+            {
+                if (_outgoingTransfers.ContainsKey(fileId))
+                {
+                    context = _outgoingTransfers[fileId];
+                    _outgoingTransfers.Remove(fileId);
+                }
+            }
+
+            if (context == null)
+            {
+                return;
+            }
+
+            ContinueSendingFile(fileId, context.FilePath, context.TargetPeer, context.SenderName);
+        }
+
+        public void HandleTransferRejected(string fileId)
+        {
+            FileTransferInfo transfer = null;
+
+            lock (_transfersLock)
+            {
+                if (_activeTransfers.ContainsKey(fileId))
+                {
+                    transfer = _activeTransfers[fileId];
+                    transfer.IsCancelled = true;
+                    _activeTransfers.Remove(fileId);
+                }
+            }
+
+            RemoveOutgoingTransfer(fileId);
+
+            if (transfer != null)
+            {
+                TransferFailed?.Invoke(this, transfer);
+            }
         }
 
         private void SendFileChunks(string fileId, string filePath, PeerInfo targetPeer, string senderName)
@@ -276,6 +346,17 @@ namespace LazyChat.Services
             }
         }
 
+        private void RemoveOutgoingTransfer(string fileId)
+        {
+            lock (_outgoingLock)
+            {
+                if (_outgoingTransfers.ContainsKey(fileId))
+                {
+                    _outgoingTransfers.Remove(fileId);
+                }
+            }
+        }
+
         public void CancelTransfer(string fileId)
         {
             lock (_transfersLock)
@@ -306,6 +387,11 @@ namespace LazyChat.Services
                 }
                 _activeFileStreams.Clear();
                 _activeTransfers.Clear();
+            }
+
+            lock (_outgoingLock)
+            {
+                _outgoingTransfers.Clear();
             }
         }
     }

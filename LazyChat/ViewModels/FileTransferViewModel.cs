@@ -16,6 +16,7 @@ namespace LazyChat.ViewModels
         private readonly bool _isReceiving;
         private int _progress;
         private string _progressText;
+        private string _infoText;
         private bool _showProgress;
         private bool _showAcceptReject;
         private bool _showClose;
@@ -44,7 +45,18 @@ namespace LazyChat.ViewModels
             SetupDialog();
         }
 
-        public string InfoText { get; private set; }
+        public string InfoText
+        {
+            get => _infoText;
+            private set
+            {
+                if (_infoText != value)
+                {
+                    _infoText = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
         public string FileNameText => $"文件名: {_transferInfo.FileName}";
         public string FileSizeText => $"大小: {FormatFileSize(_transferInfo.FileSize)}";
 
@@ -139,7 +151,7 @@ namespace LazyChat.ViewModels
                 ShowProgress = true;
                 ShowAcceptReject = false;
                 ShowClose = false;
-                ProgressText = "进度: 0%";
+                ProgressText = "等待对方接受...";
             }
         }
 
@@ -153,6 +165,16 @@ namespace LazyChat.ViewModels
                 ProgressText = "传输完成!";
                 ShowClose = true;
             }
+        }
+
+        public void UpdateInfoText(string text)
+        {
+            InfoText = text;
+        }
+
+        public void MarkSending()
+        {
+            ProgressText = "进度: 0%";
         }
 
         private async void Accept()

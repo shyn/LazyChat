@@ -192,11 +192,6 @@ LIMIT @limit;
                                     parsedTime = parsedTime.ToLocalTime();
                                 }
 
-                                if (parsedTime.Kind == DateTimeKind.Utc)
-                                {
-                                    parsedTime = parsedTime.ToLocalTime();
-                                }
-
                                 result.Add(new ConversationSummary
                                 {
                                     PeerId = peerId,
@@ -305,7 +300,7 @@ LIMIT @limit;
                                     catch
                                     {
                                         message.MessageType = ChatMessageType.Text;
-                                        message.TextContent = "Image load failed";
+                                        message.TextContent = "图片加载失败";
                                     }
                                 }
 
