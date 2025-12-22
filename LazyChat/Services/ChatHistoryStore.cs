@@ -363,5 +363,27 @@ WHERE message_id IN (
         public void Dispose()
         {
         }
+
+        public void DeleteConversation(string peerId)
+        {
+            if (string.IsNullOrWhiteSpace(peerId)) return;
+
+            Initialize();
+
+            lock (_lock)
+            {
+                using (SqliteConnection connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    using (SqliteCommand command = connection.CreateCommand())
+                    {
+                        command.CommandText = "DELETE FROM messages WHERE peer_id = @peer_id;";
+                        command.Parameters.AddWithValue("@peer_id", peerId);
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+        }
     }
 }

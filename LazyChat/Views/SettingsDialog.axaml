@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="320"
+        x:Class="LazyChat.Views.SettingsDialog"
+        Title="设置"
+        Width="450" Height="320"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#FAFBFC">
+
+    <Border Padding="28">
+        <StackPanel Spacing="24">
+            <!-- Title -->
+            <TextBlock Text="设置" 
+                       FontSize="20"
+                       FontWeight="Bold"
+                       Foreground="#1D1D1F"/>
+            
+            <!-- Username -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="用户名" 
+                           FontSize="14"
+                           FontWeight="Medium"
+                           Foreground="#1D1D1F"/>
+                <TextBox x:Name="UsernameTextBox"
+                         Classes="modern"
+                         FontSize="15"/>
+                <TextBlock Text="修改后需要重启应用才能生效"
+                           FontSize="12"
+                           Foreground="#86868B"/>
+            </StackPanel>
+            
+            <!-- Send Shortcut -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="发送消息快捷键" 
+                           FontSize="14"
+                           FontWeight="Medium"
+                           Foreground="#1D1D1F"/>
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                    <RadioButton x:Name="EnterToSendRadio"
+                                 Content="Enter 发送, Shift+Enter 换行"
+                                 GroupName="SendShortcut"
+                                 FontSize="14"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                    <RadioButton x:Name="CtrlEnterToSendRadio"
+                                 Content="Ctrl+Enter 发送, Enter 换行"
+                                 GroupName="SendShortcut"
+                                 FontSize="14"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Buttons -->
+            <StackPanel Orientation="Horizontal" 
+                        HorizontalAlignment="Right" 
+                        Spacing="12"
+                        Margin="0,16,0,0">
+                <Button x:Name="CancelButton"
+                        Content="取消" 
+                        Classes="secondary"
+                        MinWidth="90"/>
+                <Button x:Name="SaveButton"
+                        Content="保存" 
+                        Classes="primary"
+                        MinWidth="90"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

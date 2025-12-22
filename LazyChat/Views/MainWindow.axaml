@@ -41,7 +41,7 @@
                         </StackPanel>
                         <Button Grid.Column="1"
                                 Classes="icon"
-                                Command="{Binding SetUsernameCommand}"
+                                Command="{Binding SettingsCommand}"
                                 ToolTip.Tip="设置">
                             <PathIcon Data="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66z"
                                      Width="18" Height="18"
@@ -57,20 +57,12 @@
                              Text="{Binding SearchText}"/>
                 </Border>
                 
-                <!-- Contacts List -->
+                <!-- Unified Contacts List -->
                 <ScrollViewer Grid.Row="2" 
                               HorizontalScrollBarVisibility="Disabled">
                     <StackPanel>
-                        <!-- Online Section -->
-                        <TextBlock Text="在线" 
-                                   FontSize="12" 
-                                   FontWeight="SemiBold"
-                                   Foreground="#86868B"
-                                   Margin="20,8,20,8"
-                                   IsVisible="{Binding HasOnlinePeers}"/>
-                        
-                        <ListBox ItemsSource="{Binding OnlinePeers}"
-                                 SelectedItem="{Binding SelectedPeer}"
+                        <ListBox ItemsSource="{Binding FilteredContacts}"
+                                 SelectedItem="{Binding SelectedContact}"
                                  Background="Transparent"
                                  BorderThickness="0"
                                  Padding="0">
@@ -90,115 +82,47 @@
                                 <DataTemplate>
                                     <Border Padding="20,12">
                                         <Grid ColumnDefinitions="48,*,Auto">
-                                            <!-- Avatar -->
+                                            <!-- Avatar with status indicator -->
                                             <Border Grid.Column="0"
                                                     Width="44" Height="44"
                                                     CornerRadius="22"
-                                                    Background="#E8F5E9">
+                                                    Background="{Binding IsOnline, Converter={x:Static vm:BoolConverters.OnlineToAvatarBackground}}">
                                                 <Panel>
                                                     <TextBlock Text="{Binding Initial}"
                                                                FontSize="18"
                                                                FontWeight="SemiBold"
-                                                               Foreground="#2E7D32"
+                                                               Foreground="{Binding IsOnline, Converter={x:Static vm:BoolConverters.OnlineToAvatarForeground}}"
                                                                HorizontalAlignment="Center"
                                                                VerticalAlignment="Center"/>
-                                                    <!-- Online indicator -->
+                                                    <!-- Online indicator dot -->
                                                     <Ellipse Width="14" Height="14"
-                                                             Fill="#34C759"
+                                                             Fill="{Binding IsOnline, Converter={x:Static vm:BoolConverters.OnlineToStatusColor}}"
                                                              Stroke="#FFFFFF"
                                                              StrokeThickness="2"
                                                              HorizontalAlignment="Right"
                                                              VerticalAlignment="Bottom"
-                                                             Margin="0,0,-2,-2"/>
+                                                             Margin="0,0,-2,-2"
+                                                             IsVisible="{Binding IsOnline}"/>
                                                 </Panel>
                                             </Border>
                                             
-                                            <!-- Name & IP -->
+                                            <!-- Name & Status -->
                                             <StackPanel Grid.Column="1" 
                                                         VerticalAlignment="Center"
                                                         Margin="12,0,0,0"
                                                         Spacing="2">
-                                                <TextBlock Text="{Binding UserName}" 
-                                                           FontSize="15"
-                                                           FontWeight="Medium"
-                                                           Foreground="#1D1D1F"/>
-                                                <TextBlock Text="{Binding IpAddressString}" 
-                                                           FontSize="12"
-                                                           Foreground="#86868B"/>
-                                            </StackPanel>
-                                            
-                                            <!-- Unread Badge -->
-                                            <Border Grid.Column="2"
-                                                    Background="#FF3B30"
-                                                    CornerRadius="10"
-                                                    Padding="8,4"
-                                                    VerticalAlignment="Center"
-                                                    IsVisible="{Binding HasUnread}">
-                                                <TextBlock Text="{Binding UnreadCount}"
-                                                           FontSize="12"
-                                                           FontWeight="Bold"
-                                                           Foreground="White"/>
-                                            </Border>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                        
-                        <!-- Recent/Offline Section -->
-                        <TextBlock Text="最近联系" 
-                                   FontSize="12" 
-                                   FontWeight="SemiBold"
-                                   Foreground="#86868B"
-                                   Margin="20,20,20,8"
-                                   IsVisible="{Binding HasRecentConversations}"/>
-                        
-                        <ListBox ItemsSource="{Binding FilteredRecentConversations}"
-                                 SelectedItem="{Binding SelectedConversation}"
-                                 Background="Transparent"
-                                 BorderThickness="0"
-                                 Padding="0">
-                            <ListBox.Styles>
-                                <Style Selector="ListBoxItem">
-                                    <Setter Property="Padding" Value="0"/>
-                                    <Setter Property="Margin" Value="0"/>
-                                </Style>
-                                <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
-                                    <Setter Property="Background" Value="#F0F5FF"/>
-                                </Style>
-                                <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
-                                    <Setter Property="Background" Value="#F5F5F7"/>
-                                </Style>
-                            </ListBox.Styles>
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Padding="20,12">
-                                        <Grid ColumnDefinitions="48,*,Auto">
-                                            <!-- Avatar -->
-                                            <Border Grid.Column="0"
-                                                    Width="44" Height="44"
-                                                    CornerRadius="22"
-                                                    Background="#F5F5F7">
-                                                <TextBlock Text="{Binding Initial}"
-                                                           FontSize="18"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="#86868B"
-                                                           HorizontalAlignment="Center"
-                                                           VerticalAlignment="Center"/>
-                                            </Border>
-                                            
-                                            <!-- Name & Time -->
-                                            <StackPanel Grid.Column="1" 
-                                                        VerticalAlignment="Center"
-                                                        Margin="12,0,0,0"
-                                                        Spacing="2">
-                                                <TextBlock Text="{Binding PeerName}" 
+                                                <TextBlock Text="{Binding DisplayName}" 
                                                            FontSize="15"
                                                            FontWeight="Medium"
                                                            Foreground="#1D1D1F"/>
                                                 <TextBlock Text="{Binding LastMessageTimeText}" 
                                                            FontSize="12"
-                                                           Foreground="#86868B"/>
+                                                           Foreground="#86868B"
+                                                           IsVisible="{Binding !IsOnline}"/>
+                                                <TextBlock Text="在线" 
+                                                           FontSize="12"
+                                                           Foreground="#34C759"
+                                                           IsVisible="{Binding IsOnline}"/>
                                             </StackPanel>
                                             
                                             <!-- Unread Badge -->
@@ -218,6 +142,14 @@
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
+                        
+                        <!-- Empty State -->
+                        <TextBlock Text="暂无联系人"
+                                   FontSize="14"
+                                   Foreground="#AEAEB2"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,40,0,0"
+                                   IsVisible="{Binding !HasContacts}"/>
                     </StackPanel>
                 </ScrollViewer>
                 
@@ -245,23 +177,23 @@
                     BorderBrush="#E5E5EA"
                     BorderThickness="0,0,0,1">
                 <Panel>
-                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasSelectedPeer}">
+                    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasSelectedContact}">
                         <StackPanel Grid.Column="0" 
                                     Orientation="Horizontal" 
                                     Spacing="16">
                             <!-- Avatar -->
                             <Border Width="44" Height="44"
                                     CornerRadius="22"
-                                    Background="{Binding SelectedPeerAvatarBackground}">
+                                    Background="{Binding SelectedContactAvatarBackground}">
                                 <Panel>
-                                    <TextBlock Text="{Binding SelectedPeerInitial}"
+                                    <TextBlock Text="{Binding SelectedContactInitial}"
                                                FontSize="18"
                                                FontWeight="SemiBold"
-                                               Foreground="{Binding SelectedPeerAvatarForeground}"
+                                               Foreground="{Binding SelectedContactAvatarForeground}"
                                                HorizontalAlignment="Center"
                                                VerticalAlignment="Center"/>
                                     <Ellipse Width="14" Height="14"
-                                             Fill="{Binding SelectedPeerStatusColor}"
+                                             Fill="{Binding SelectedContactStatusColor}"
                                              Stroke="#FFFFFF"
                                              StrokeThickness="2"
                                              HorizontalAlignment="Right"
@@ -270,11 +202,11 @@
                                 </Panel>
                             </Border>
                             <StackPanel VerticalAlignment="Center" Spacing="2">
-                                <TextBlock Text="{Binding SelectedPeerName}" 
+                                <TextBlock Text="{Binding SelectedContactName}" 
                                            FontSize="17"
                                            FontWeight="SemiBold"
                                            Foreground="#1D1D1F"/>
-                                <TextBlock Text="{Binding SelectedPeerStatus}" 
+                                <TextBlock Text="{Binding SelectedContactStatus}" 
                                            FontSize="13"
                                            Foreground="#86868B"/>
                             </StackPanel>
@@ -285,16 +217,16 @@
                                     Orientation="Horizontal" 
                                     Spacing="8">
                             <Button Classes="icon"
-                                    Command="{Binding AttachFileCommand}"
-                                    ToolTip.Tip="发送文件">
-                                <PathIcon Data="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"
+                                    Command="{Binding ShowProfileCommand}"
+                                    ToolTip.Tip="查看资料">
+                                <PathIcon Data="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
                                          Width="20" Height="20"
                                          Foreground="#86868B"/>
                             </Button>
                             <Button Classes="icon"
-                                    Command="{Binding AttachImageCommand}"
-                                    ToolTip.Tip="发送图片">
-                                <PathIcon Data="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"
+                                    Command="{Binding DeleteConversationCommand}"
+                                    ToolTip.Tip="删除会话">
+                                <PathIcon Data="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
                                          Width="20" Height="20"
                                          Foreground="#86868B"/>
                             </Button>
@@ -305,7 +237,7 @@
                     <TextBlock Text="选择联系人开始聊天"
                                FontSize="16"
                                Foreground="#86868B"
-                               IsVisible="{Binding !HasSelectedPeer}"/>
+                               IsVisible="{Binding !HasSelectedContact}"/>
                 </Panel>
             </Border>
             
@@ -421,7 +353,7 @@
                     Background="#FFFFFF"
                     BorderBrush="#E5E5EA"
                     BorderThickness="0,1,0,0"
-                    IsVisible="{Binding HasSelectedPeer}">
+                    IsVisible="{Binding HasSelectedContact}">
                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto">
                     <!-- Message Input -->
                     <Border Grid.Column="0"
@@ -430,6 +362,7 @@
                             Padding="4">
                         <Grid ColumnDefinitions="*,Auto">
                             <TextBox Grid.Column="0"
+                                     x:Name="MessageTextBox"
                                      Text="{Binding MessageText}"
                                      Watermark="输入消息..."
                                      AcceptsReturn="True"
@@ -489,7 +422,7 @@
             <Border Grid.Row="2"
                     Height="80"
                     Background="#F5F5F7"
-                    IsVisible="{Binding !HasSelectedPeer}">
+                    IsVisible="{Binding !HasSelectedContact}">
                 <TextBlock Text="选择一个联系人开始聊天"
                            FontSize="14"
                            Foreground="#AEAEB2"
