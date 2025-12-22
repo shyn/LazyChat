@@ -64,11 +64,21 @@
                              Background="White">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Orientation="Vertical" Margin="5">
-                                <TextBlock Text="{Binding PeerName}" FontWeight="SemiBold"/>
-                                    <TextBlock Text="{Binding LastMessageTime, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}"
-                                               FontSize="11" Foreground="Gray"/>
-                                </StackPanel>
+                                <Grid ColumnDefinitions="*,Auto" Margin="5">
+                                    <StackPanel Orientation="Vertical" Grid.Column="0">
+                                        <TextBlock Text="{Binding PeerName}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding LastMessageTime, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}"
+                                                   FontSize="11" Foreground="Gray"/>
+                                    </StackPanel>
+                                    <Border Grid.Column="1"
+                                            Background="#E53935"
+                                            Padding="6,2"
+                                            CornerRadius="10"
+                                            VerticalAlignment="Center"
+                                            IsVisible="{Binding HasUnread}">
+                                        <TextBlock Text="{Binding UnreadCount}" Foreground="White" FontWeight="Bold" />
+                                    </Border>
+                                </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>

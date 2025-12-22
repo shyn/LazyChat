@@ -477,8 +477,6 @@ namespace LazyChat.ViewModels
             conv.Messages.Add(message);
             conv.LastMessageTime = message.Timestamp;
 
-            UpsertRecentConversation(peerId, peerName, message.Timestamp);
-
             if (SelectedPeer != null && SelectedPeer.PeerId == peerId)
             {
                 DisplayMessage(message);
@@ -487,6 +485,9 @@ namespace LazyChat.ViewModels
             {
                 conv.UnreadCount++;
             }
+
+            UpsertRecentConversation(peerId, peerName, message.Timestamp, conv.UnreadCount);
+            UpdateConversationUnread(peerId, conv.UnreadCount);
         }
 
         private void DisplayMessage(ChatMessage message)
@@ -525,6 +526,8 @@ namespace LazyChat.ViewModels
                     conv.Messages.Add(msg);
                     DisplayMessage(msg);
                 }
+
+                UpdateConversationUnread(peer.PeerId, conv.UnreadCount);
             }
         }
 
@@ -536,26 +539,27 @@ namespace LazyChat.ViewModels
             foreach (ConversationSummary item in recent)
             {
                 bool isOnline = OnlinePeers.Any(p => p.PeerId == item.PeerId);
-                RecentConversations.Add(new ConversationListItem(item.PeerId, item.PeerName, item.LastMessageTime, isOnline));
+                RecentConversations.Add(new ConversationListItem(item.PeerId, item.PeerName, item.LastMessageTime, isOnline, 0));
             }
 
             OnPropertyChanged(nameof(RecentListHeader));
         }
 
-        private void UpsertRecentConversation(string peerId, string peerName, DateTime lastMessageTime)
+        private void UpsertRecentConversation(string peerId, string peerName, DateTime lastMessageTime, int unreadCount)
         {
             ConversationListItem existing = RecentConversations.FirstOrDefault(c => c.PeerId == peerId);
             bool isOnline = OnlinePeers.Any(p => p.PeerId == peerId);
 
             if (existing == null)
             {
-                RecentConversations.Insert(0, new ConversationListItem(peerId, peerName, lastMessageTime, isOnline));
+                RecentConversations.Insert(0, new ConversationListItem(peerId, peerName, lastMessageTime, isOnline, unreadCount));
             }
             else
             {
                 existing.PeerName = peerName;
                 existing.LastMessageTime = lastMessageTime;
                 existing.IsOnline = isOnline;
+                existing.UnreadCount = unreadCount;
 
                 int index = RecentConversations.IndexOf(existing);
                 if (index > 0)
@@ -578,6 +582,15 @@ namespace LazyChat.ViewModels
             if (item != null)
             {
                 item.IsOnline = isOnline;
+            }
+        }
+
+        private void UpdateConversationUnread(string peerId, int unreadCount)
+        {
+            ConversationListItem item = RecentConversations.FirstOrDefault(c => c.PeerId == peerId);
+            if (item != null)
+            {
+                item.UnreadCount = unreadCount;
             }
         }
 
@@ -894,15 +907,17 @@ namespace LazyChat.ViewModels
         private string _peerName;
         private DateTime _lastMessageTime;
         private bool _isOnline;
+        private int _unreadCount;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        public ConversationListItem(string peerId, string peerName, DateTime lastMessageTime, bool isOnline)
+        public ConversationListItem(string peerId, string peerName, DateTime lastMessageTime, bool isOnline, int unreadCount)
         {
             PeerId = peerId;
             _peerName = peerName;
             _lastMessageTime = lastMessageTime;
             _isOnline = isOnline;
+            _unreadCount = unreadCount;
         }
 
         public string PeerId { get; }
@@ -945,6 +960,22 @@ namespace LazyChat.ViewModels
                 }
             }
         }
+
+        public int UnreadCount
+        {
+            get => _unreadCount;
+            set
+            {
+                if (_unreadCount != value)
+                {
+                    _unreadCount = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(HasUnread));
+                }
+            }
+        }
+
+        public bool HasUnread => _unreadCount > 0;
 
         private void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
