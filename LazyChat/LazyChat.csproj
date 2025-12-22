@@ -31,6 +31,7 @@
     
     <!-- Add System.Drawing.Common for cross-platform image handling -->
     <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
   </ItemGroup>
 
   <!-- Remove legacy WinForms files from compilation -->
@@ -60,4 +61,3 @@
     </Compile>
   </ItemGroup>
 </Project>
-

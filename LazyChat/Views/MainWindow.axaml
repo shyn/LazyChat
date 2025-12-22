@@ -37,11 +37,12 @@
         <Grid ColumnDefinitions="250,*">
             <!-- Left Panel - User List -->
             <Border Grid.Column="0" BorderBrush="#D0D0D0" BorderThickness="0,0,1,0">
-                <DockPanel>
-                    <Border DockPanel.Dock="Top" Background="#F8F8F8" Padding="10">
+                <Grid RowDefinitions="Auto,*,Auto,*">
+                    <Border Grid.Row="0" Background="#F8F8F8" Padding="10">
                         <TextBlock Text="{Binding UserListHeader}" FontWeight="Bold" FontSize="14"/>
                     </Border>
-                    <ListBox ItemsSource="{Binding OnlinePeers}"
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding OnlinePeers}"
                              SelectedItem="{Binding SelectedPeer}"
                              Background="White">
                         <ListBox.ItemTemplate>
@@ -53,7 +54,25 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                </DockPanel>
+
+                    <Border Grid.Row="2" Background="#F8F8F8" Padding="10" BorderBrush="#D0D0D0" BorderThickness="0,1,0,1">
+                        <TextBlock Text="{Binding RecentListHeader}" FontWeight="Bold" FontSize="14"/>
+                    </Border>
+                    <ListBox Grid.Row="3"
+                             ItemsSource="{Binding RecentConversations}"
+                             SelectedItem="{Binding SelectedConversation}"
+                             Background="White">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Vertical" Margin="5">
+                                <TextBlock Text="{Binding PeerName}" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding LastMessageTime, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}"
+                                               FontSize="11" Foreground="Gray"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
             </Border>
 
             <!-- Right Panel - Chat Area -->

@@ -24,14 +24,19 @@ namespace LazyChat.ViewModels
         private PeerDiscoveryService _discoveryService;
         private P2PCommunicationService _commService;
         private FileTransferService _fileTransferService;
+        private ChatHistoryStore _historyStore;
         private Dictionary<string, Conversation> _conversations;
         private PeerInfo _selectedPeer;
+        private ConversationListItem _selectedConversation;
         private string _statusText;
         private string _messageText;
         private Dictionary<string, Window> _activeTransferWindows;
         private bool _isInitialized;
+        private const int RecentConversationLimit = 50;
+        private const int HistoryLoadLimit = 200;
 
         public ObservableCollection<PeerInfo> OnlinePeers { get; }
+        public ObservableCollection<ConversationListItem> RecentConversations { get; }
         public ObservableCollection<MessageViewModel> Messages { get; }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -39,20 +44,25 @@ namespace LazyChat.ViewModels
         public MainWindowViewModel()
         {
             OnlinePeers = new ObservableCollection<PeerInfo>();
+            RecentConversations = new ObservableCollection<ConversationListItem>();
             Messages = new ObservableCollection<MessageViewModel>();
             _conversations = new Dictionary<string, Conversation>();
             _activeTransferWindows = new Dictionary<string, Window>();
             _statusText = "就绪";
 
-            SendMessageCommand = new RelayCommand(SendTextMessage, () => SelectedPeer != null && !string.IsNullOrWhiteSpace(MessageText));
-            AttachImageCommand = new RelayCommand(async () => await AttachImageAsync(), () => SelectedPeer != null);
-            AttachFileCommand = new RelayCommand(async () => await AttachFileAsync(), () => SelectedPeer != null);
+            SendMessageCommand = new RelayCommand(SendTextMessage, () => CanSendMessage());
+            AttachImageCommand = new RelayCommand(async () => await AttachImageAsync(), () => CanSendToSelectedPeer());
+            AttachFileCommand = new RelayCommand(async () => await AttachFileAsync(), () => CanSendToSelectedPeer());
             SetUsernameCommand = new RelayCommand(async () => await SetUsernameAsync());
             ExitCommand = new RelayCommand(Exit);
             AboutCommand = new RelayCommand(ShowAbout);
+
+            OnlinePeers.CollectionChanged += (_, __) => UpdateCommandStates();
+            RecentConversations.CollectionChanged += (_, __) => OnPropertyChanged(nameof(RecentListHeader));
         }
 
         public string UserListHeader => $"在线用户 ({OnlinePeers.Count})";
+        public string RecentListHeader => $"Recent Conversations ({RecentConversations.Count})";
 
         public string ChatHeaderText
         {
@@ -77,9 +87,40 @@ namespace LazyChat.ViewModels
                     LoadConversation(value);
                     
                     // Update command states
-                    (SendMessageCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                    (AttachImageCommand as RelayCommand)?.RaiseCanExecuteChanged();
-                    (AttachFileCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                    UpdateCommandStates();
+
+                    if (_selectedPeer != null)
+                    {
+                        SelectConversationItem(_selectedPeer.PeerId);
+                    }
+                }
+            }
+        }
+
+        public ConversationListItem SelectedConversation
+        {
+            get => _selectedConversation;
+            set
+            {
+                if (_selectedConversation != value)
+                {
+                    _selectedConversation = value;
+                    OnPropertyChanged();
+
+                    if (_selectedConversation != null)
+                    {
+                        PeerInfo peer = OnlinePeers.FirstOrDefault(p => p.PeerId == _selectedConversation.PeerId);
+                        if (peer == null)
+                        {
+                            peer = new PeerInfo
+                            {
+                                PeerId = _selectedConversation.PeerId,
+                                UserName = _selectedConversation.PeerName,
+                                IsOnline = false
+                            };
+                        }
+                        SelectedPeer = peer;
+                    }
                 }
             }
         }
@@ -108,7 +149,7 @@ namespace LazyChat.ViewModels
                     OnPropertyChanged();
                     
                     // Update send command state
-                    (SendMessageCommand as RelayCommand)?.RaiseCanExecuteChanged();
+                    UpdateCommandStates();
                 }
             }
         }
@@ -133,17 +174,24 @@ namespace LazyChat.ViewModels
                 throw new ArgumentNullException(nameof(owner));
             }
 
-            _userName = Environment.UserName;
+            // Load saved username or use system username as default
+            _userName = LoadSavedUsername() ?? Environment.UserName;
 
-            var inputDialog = new Views.InputDialog("设置用户名", "请输入您的用户名:", _userName);
-            var result = await inputDialog.ShowDialog<bool>(owner);
-            if (result && !string.IsNullOrWhiteSpace(inputDialog.InputText))
+            // Only prompt for username if none saved
+            if (string.IsNullOrWhiteSpace(LoadSavedUsername()))
             {
-                _userName = inputDialog.InputText;
+                var inputDialog = new Views.InputDialog("设置用户名", "请输入您的用户名:", _userName);
+                var result = await inputDialog.ShowDialog<bool>(owner);
+                if (result && !string.IsNullOrWhiteSpace(inputDialog.InputText))
+                {
+                    _userName = inputDialog.InputText;
+                    SaveUsername(_userName);
+                }
             }
 
             InitializeServices();
             StartServices();
+            InitializeHistory();
             _isInitialized = true;
         }
 
@@ -183,6 +231,20 @@ namespace LazyChat.ViewModels
             }
         }
 
+        private void InitializeHistory()
+        {
+            try
+            {
+                _historyStore = new ChatHistoryStore();
+                _historyStore.Initialize();
+                LoadRecentConversations();
+            }
+            catch (Exception ex)
+            {
+                ShowError("Failed to initialize history: " + ex.Message);
+            }
+        }
+
         private void DiscoveryService_PeerDiscovered(object sender, PeerInfo peer)
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
@@ -192,6 +254,8 @@ namespace LazyChat.ViewModels
                     OnlinePeers.Add(peer);
                     OnPropertyChanged(nameof(UserListHeader));
                     StatusText = $"{peer.UserName} 已上线";
+                    UpdateCommandStates();
+                    UpdateConversationPresence(peer.PeerId, true);
                 }
             });
         }
@@ -211,6 +275,9 @@ namespace LazyChat.ViewModels
                     {
                         OnPropertyChanged(nameof(ChatHeaderText));
                     }
+
+                    UpdateCommandStates();
+                    UpdateConversationPresence(peer.PeerId, false);
                 }
             });
         }
@@ -258,6 +325,7 @@ namespace LazyChat.ViewModels
             {
                 SenderId = message.SenderId,
                 SenderName = message.SenderName,
+                ReceiverId = _discoveryService.GetLocalPeer().PeerId,
                 TextContent = message.TextContent,
                 MessageType = ChatMessageType.Text,
                 Timestamp = message.Timestamp,
@@ -273,9 +341,11 @@ namespace LazyChat.ViewModels
             {
                 SenderId = message.SenderId,
                 SenderName = message.SenderName,
+                ReceiverId = _discoveryService.GetLocalPeer().PeerId,
                 MessageType = ChatMessageType.Image,
                 Timestamp = message.Timestamp,
-                IsSentByMe = false
+                IsSentByMe = false,
+                ImageBytes = message.Data
             };
 
             try
@@ -313,6 +383,18 @@ namespace LazyChat.ViewModels
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
             {
+                ChatMessage fileMessage = new ChatMessage
+                {
+                    SenderId = transfer.SenderId,
+                    SenderName = transfer.SenderName,
+                    ReceiverId = _discoveryService.GetLocalPeer().PeerId,
+                    MessageType = ChatMessageType.File,
+                    FileName = transfer.FileName,
+                    FileSize = transfer.FileSize,
+                    IsSentByMe = false
+                };
+                AddMessageToConversation(transfer.SenderId, transfer.SenderName, fileMessage);
+
                 var dialog = new Views.FileTransferWindow(transfer, true);
                 if (Application.Current.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 {
@@ -369,6 +451,18 @@ namespace LazyChat.ViewModels
 
         private void AddMessageToConversation(string peerId, string peerName, ChatMessage message)
         {
+            if (_historyStore != null)
+            {
+                try
+                {
+                    _historyStore.SaveMessage(message, peerId, peerName);
+                }
+                catch (Exception ex)
+                {
+                    StatusText = "History save failed: " + ex.Message;
+                }
+            }
+
             if (!_conversations.ContainsKey(peerId))
             {
                 _conversations[peerId] = new Conversation
@@ -379,8 +473,11 @@ namespace LazyChat.ViewModels
             }
 
             Conversation conv = _conversations[peerId];
+            conv.PeerName = peerName;
             conv.Messages.Add(message);
             conv.LastMessageTime = message.Timestamp;
+
+            UpsertRecentConversation(peerId, peerName, message.Timestamp);
 
             if (SelectedPeer != null && SelectedPeer.PeerId == peerId)
             {
@@ -401,15 +498,96 @@ namespace LazyChat.ViewModels
         {
             Messages.Clear();
 
-            if (peer != null && _conversations.ContainsKey(peer.PeerId))
+            if (peer != null)
             {
-                Conversation conv = _conversations[peer.PeerId];
+                Conversation conv;
+                if (!_conversations.ContainsKey(peer.PeerId))
+                {
+                    conv = new Conversation
+                    {
+                        PeerId = peer.PeerId,
+                        PeerName = peer.UserName
+                    };
+                    _conversations[peer.PeerId] = conv;
+                }
+                else
+                {
+                    conv = _conversations[peer.PeerId];
+                }
+
+                conv.PeerName = peer.UserName;
+                conv.Messages.Clear();
                 conv.UnreadCount = 0;
 
-                foreach (ChatMessage msg in conv.Messages)
+                List<ChatMessage> history = _historyStore?.LoadMessagesForPeer(peer.PeerId, HistoryLoadLimit) ?? new List<ChatMessage>();
+                foreach (ChatMessage msg in history)
                 {
+                    conv.Messages.Add(msg);
                     DisplayMessage(msg);
                 }
+            }
+        }
+
+        private void LoadRecentConversations()
+        {
+            RecentConversations.Clear();
+
+            List<ConversationSummary> recent = _historyStore?.LoadRecentConversations(RecentConversationLimit) ?? new List<ConversationSummary>();
+            foreach (ConversationSummary item in recent)
+            {
+                bool isOnline = OnlinePeers.Any(p => p.PeerId == item.PeerId);
+                RecentConversations.Add(new ConversationListItem(item.PeerId, item.PeerName, item.LastMessageTime, isOnline));
+            }
+
+            OnPropertyChanged(nameof(RecentListHeader));
+        }
+
+        private void UpsertRecentConversation(string peerId, string peerName, DateTime lastMessageTime)
+        {
+            ConversationListItem existing = RecentConversations.FirstOrDefault(c => c.PeerId == peerId);
+            bool isOnline = OnlinePeers.Any(p => p.PeerId == peerId);
+
+            if (existing == null)
+            {
+                RecentConversations.Insert(0, new ConversationListItem(peerId, peerName, lastMessageTime, isOnline));
+            }
+            else
+            {
+                existing.PeerName = peerName;
+                existing.LastMessageTime = lastMessageTime;
+                existing.IsOnline = isOnline;
+
+                int index = RecentConversations.IndexOf(existing);
+                if (index > 0)
+                {
+                    RecentConversations.Move(index, 0);
+                }
+            }
+
+            while (RecentConversations.Count > RecentConversationLimit)
+            {
+                RecentConversations.RemoveAt(RecentConversations.Count - 1);
+            }
+
+            OnPropertyChanged(nameof(RecentListHeader));
+        }
+
+        private void UpdateConversationPresence(string peerId, bool isOnline)
+        {
+            ConversationListItem item = RecentConversations.FirstOrDefault(c => c.PeerId == peerId);
+            if (item != null)
+            {
+                item.IsOnline = isOnline;
+            }
+        }
+
+        private void SelectConversationItem(string peerId)
+        {
+            ConversationListItem item = RecentConversations.FirstOrDefault(c => c.PeerId == peerId);
+            if (item != null && _selectedConversation != item)
+            {
+                _selectedConversation = item;
+                OnPropertyChanged(nameof(SelectedConversation));
             }
         }
 
@@ -417,6 +595,12 @@ namespace LazyChat.ViewModels
         {
             if (SelectedPeer == null || string.IsNullOrWhiteSpace(MessageText))
                 return;
+
+            if (!IsSelectedPeerOnline())
+            {
+                ShowInfo("对方离线，无法发送消息!");
+                return;
+            }
 
             bool sent = _commService.SendTextMessage(MessageText, SelectedPeer, _userName);
 
@@ -426,6 +610,7 @@ namespace LazyChat.ViewModels
                 {
                     SenderId = _discoveryService.GetLocalPeer().PeerId,
                     SenderName = _userName,
+                    ReceiverId = SelectedPeer.PeerId,
                     TextContent = MessageText,
                     MessageType = ChatMessageType.Text,
                     IsSentByMe = true
@@ -445,6 +630,12 @@ namespace LazyChat.ViewModels
             if (SelectedPeer == null)
             {
                 ShowInfo("请先选择一个用户!");
+                return;
+            }
+
+            if (!IsSelectedPeerOnline())
+            {
+                ShowInfo("对方离线，无法发送图片!");
                 return;
             }
 
@@ -475,6 +666,12 @@ namespace LazyChat.ViewModels
                 return;
             }
 
+            if (!IsSelectedPeerOnline())
+            {
+                ShowInfo("对方离线，无法发送文件!");
+                return;
+            }
+
             if (Application.Current.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 var files = await desktop.MainWindow.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
@@ -486,6 +683,18 @@ namespace LazyChat.ViewModels
                 if (files.Count > 0)
                 {
                     var filePath = files[0].Path.LocalPath;
+                    FileInfo fileInfo = new FileInfo(filePath);
+                    ChatMessage fileMessage = new ChatMessage
+                    {
+                        SenderId = _discoveryService.GetLocalPeer().PeerId,
+                        SenderName = _userName,
+                        ReceiverId = SelectedPeer.PeerId,
+                        MessageType = ChatMessageType.File,
+                        FileName = fileInfo.Name,
+                        FileSize = fileInfo.Length,
+                        IsSentByMe = true
+                    };
+                    AddMessageToConversation(SelectedPeer.PeerId, SelectedPeer.UserName, fileMessage);
                     _fileTransferService.StartSendingFile(filePath, SelectedPeer, _userName);
                 }
             }
@@ -496,6 +705,11 @@ namespace LazyChat.ViewModels
             try
             {
                 byte[] imageData = File.ReadAllBytes(imagePath);
+                if (!IsSelectedPeerOnline())
+                {
+                    ShowInfo("对方离线，无法发送图片!");
+                    return;
+                }
                 bool sent = _commService.SendImageMessage(imageData, SelectedPeer, _userName);
 
                 if (sent)
@@ -504,7 +718,9 @@ namespace LazyChat.ViewModels
                     {
                         SenderId = _discoveryService.GetLocalPeer().PeerId,
                         SenderName = _userName,
+                        ReceiverId = SelectedPeer.PeerId,
                         ImageContent = new Bitmap(imagePath),
+                        ImageBytes = imageData,
                         MessageType = ChatMessageType.Image,
                         IsSentByMe = true
                     };
@@ -531,8 +747,52 @@ namespace LazyChat.ViewModels
                 if (result && !string.IsNullOrWhiteSpace(inputDialog.InputText))
                 {
                     _userName = inputDialog.InputText;
-                    StatusText = "用户名已更新";
+                    SaveUsername(_userName);
+                    StatusText = "用户名已更新 (需要重启才能生效)";
                 }
+            }
+        }
+
+        private string LoadSavedUsername()
+        {
+            try
+            {
+                string configPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "LazyChat",
+                    "config.txt");
+                
+                if (File.Exists(configPath))
+                {
+                    return File.ReadAllText(configPath).Trim();
+                }
+            }
+            catch
+            {
+                // Fail silently
+            }
+            return null;
+        }
+
+        private void SaveUsername(string username)
+        {
+            try
+            {
+                string configDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "LazyChat");
+                
+                if (!Directory.Exists(configDir))
+                {
+                    Directory.CreateDirectory(configDir);
+                }
+                
+                string configPath = Path.Combine(configDir, "config.txt");
+                File.WriteAllText(configPath, username);
+            }
+            catch
+            {
+                // Fail silently
             }
         }
 
@@ -586,6 +846,33 @@ namespace LazyChat.ViewModels
             ShowError(message);
         }
 
+        private bool CanSendToSelectedPeer()
+        {
+            return SelectedPeer != null && IsSelectedPeerOnline();
+        }
+
+        private bool CanSendMessage()
+        {
+            return CanSendToSelectedPeer() && !string.IsNullOrWhiteSpace(MessageText);
+        }
+
+        private bool IsSelectedPeerOnline()
+        {
+            if (SelectedPeer == null)
+            {
+                return false;
+            }
+
+            return OnlinePeers.Any(p => p.PeerId == SelectedPeer.PeerId);
+        }
+
+        private void UpdateCommandStates()
+        {
+            (SendMessageCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (AttachImageCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            (AttachFileCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        }
+
         public void Cleanup()
         {
             _discoveryService?.Stop();
@@ -593,9 +880,73 @@ namespace LazyChat.ViewModels
             _commService?.Stop();
             _commService?.Dispose();
             _fileTransferService?.Dispose();
+            _historyStore?.Dispose();
         }
 
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public class ConversationListItem : INotifyPropertyChanged
+    {
+        private string _peerName;
+        private DateTime _lastMessageTime;
+        private bool _isOnline;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public ConversationListItem(string peerId, string peerName, DateTime lastMessageTime, bool isOnline)
+        {
+            PeerId = peerId;
+            _peerName = peerName;
+            _lastMessageTime = lastMessageTime;
+            _isOnline = isOnline;
+        }
+
+        public string PeerId { get; }
+
+        public string PeerName
+        {
+            get => _peerName;
+            set
+            {
+                if (_peerName != value)
+                {
+                    _peerName = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public DateTime LastMessageTime
+        {
+            get => _lastMessageTime;
+            set
+            {
+                if (_lastMessageTime != value)
+                {
+                    _lastMessageTime = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public bool IsOnline
+        {
+            get => _isOnline;
+            set
+            {
+                if (_isOnline != value)
+                {
+                    _isOnline = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

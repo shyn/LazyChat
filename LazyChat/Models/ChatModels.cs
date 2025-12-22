@@ -29,6 +29,7 @@ namespace LazyChat.Models
         public ChatMessageType MessageType { get; set; }
         public string TextContent { get; set; }
         public Bitmap ImageContent { get; set; }
+        public byte[] ImageBytes { get; set; }
         public string FileName { get; set; }
         public long FileSize { get; set; }
         public bool IsGroupMessage { get; set; }
