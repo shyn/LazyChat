@@ -247,7 +247,7 @@ namespace LazyChat.Services
                     if (_isRunning)
                     {
                         _logger.LogError("Error receiving discovery message", ex);
-                        OnErrorOccurred("���շ�����Ϣʧ��: " + ex.Message);
+                        OnErrorOccurred("接收发现消息失败: " + ex.Message);
                     }
                 }
             }
@@ -257,6 +257,10 @@ namespace LazyChat.Services
 
         private void ProcessDiscoveryMessage(NetworkMessage message, IPAddress senderIp)
         {
+            PeerInfo discoveredPeer = null;
+            PeerInfo leftPeer = null;
+            bool shouldRespond = false;
+
             lock (_peersLock)
             {
                 PeerInfo peer = null;
@@ -288,24 +292,38 @@ namespace LazyChat.Services
 
                 if (message.Type == MessageType.Discovery && peer != null)
                 {
-                    SendDiscoveryResponse(senderIp);
-
+                    shouldRespond = true;
                     if (isNewPeer)
                     {
-                        OnPeerDiscovered(peer);
+                        discoveredPeer = peer;
                     }
                 }
                 else if (message.Type == MessageType.DiscoveryResponse && isNewPeer && peer != null)
                 {
-                    OnPeerDiscovered(peer);
+                    discoveredPeer = peer;
                 }
                 else if (message.Type == MessageType.UserLeft && peer != null)
                 {
                     _discoveredPeers.Remove(message.SenderId);
                     peer.IsOnline = false;
-                    _logger.LogInfo($"Peer left: {peer.UserName} ({peer.IpAddress})");
-                    OnPeerLeft(peer);
+                    leftPeer = peer;
                 }
+            }
+
+            if (shouldRespond)
+            {
+                SendDiscoveryResponse(senderIp);
+            }
+
+            if (discoveredPeer != null)
+            {
+                OnPeerDiscovered(discoveredPeer);
+            }
+
+            if (leftPeer != null)
+            {
+                _logger.LogInfo($"Peer left: {leftPeer.UserName} ({leftPeer.IpAddress})");
+                OnPeerLeft(leftPeer);
             }
         }
 
@@ -367,7 +385,7 @@ namespace LazyChat.Services
                     if (_isRunning)
                     {
                         _logger.LogError("Broadcast failed", ex);
-                        OnErrorOccurred("Broadcast failed: " + ex.Message);
+                        OnErrorOccurred("广播失败: " + ex.Message);
                     }
                 }
             }
@@ -395,7 +413,7 @@ namespace LazyChat.Services
             catch (Exception ex)
             {
                 _logger.LogError($"Failed to send discovery response to {targetIp}", ex);
-                OnErrorOccurred($"Send discovery response failed: {ex.Message}");
+                OnErrorOccurred($"发送发现响应失败: {ex.Message}");
             }
         }
 
@@ -440,6 +458,8 @@ namespace LazyChat.Services
 
         private void CheckPeerTimeouts()
         {
+            List<PeerInfo> timedOutPeers = new List<PeerInfo>();
+
             lock (_peersLock)
             {
                 List<string> timeoutPeers = new List<string>();
@@ -458,9 +478,14 @@ namespace LazyChat.Services
                     PeerInfo peer = _discoveredPeers[peerId];
                     _discoveredPeers.Remove(peerId);
                     peer.IsOnline = false;
-                    _logger.LogInfo($"Peer timeout: {peer.UserName} ({peer.IpAddress})");
-                    OnPeerLeft(peer);
+                    timedOutPeers.Add(peer);
                 }
+            }
+
+            foreach (PeerInfo peer in timedOutPeers)
+            {
+                _logger.LogInfo($"Peer timeout: {peer.UserName} ({peer.IpAddress})");
+                OnPeerLeft(peer);
             }
         }
 

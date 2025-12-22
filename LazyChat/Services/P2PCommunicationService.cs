@@ -11,6 +11,7 @@ namespace LazyChat.Services
     public class P2PCommunicationService : IDisposable
     {
         private const int BUFFER_SIZE = 8192;
+        private const int MAX_MESSAGE_SIZE = 20 * 1024 * 1024;
         private TcpListener _listener;
         private Thread _listenThread;
         private bool _isRunning;
@@ -126,38 +127,29 @@ namespace LazyChat.Services
                 while (_isRunning && client.Connected)
                 {
                     byte[] lengthBytes = new byte[4];
-                    int bytesRead = stream.Read(lengthBytes, 0, 4);
-
-                    if (bytesRead == 0)
+                    if (!ReadExact(stream, lengthBytes, 4))
                         break;
 
                     int messageLength = BitConverter.ToInt32(lengthBytes, 0);
+                    if (messageLength <= 0 || messageLength > MAX_MESSAGE_SIZE)
+                        throw new InvalidDataException($"Invalid message length: {messageLength}");
+
                     byte[] messageData = new byte[messageLength];
-                    int totalRead = 0;
+                    if (!ReadExact(stream, messageData, messageLength))
+                        break;
 
-                    while (totalRead < messageLength)
+                    NetworkMessage message = NetworkMessage.Deserialize(messageData);
+                    peerId = message.SenderId;
+
+                    lock (_connectionsLock)
                     {
-                        bytesRead = stream.Read(messageData, totalRead, messageLength - totalRead);
-                        if (bytesRead == 0)
-                            break;
-                        totalRead += bytesRead;
-                    }
-
-                    if (totalRead == messageLength)
-                    {
-                        NetworkMessage message = NetworkMessage.Deserialize(messageData);
-                        peerId = message.SenderId;
-
-                        lock (_connectionsLock)
+                        if (!_activeConnections.ContainsKey(peerId))
                         {
-                            if (!_activeConnections.ContainsKey(peerId))
-                            {
-                                _activeConnections[peerId] = client;
-                            }
+                            _activeConnections[peerId] = client;
                         }
-
-                        MessageReceived?.Invoke(this, message);
                     }
+
+                    MessageReceived?.Invoke(this, message);
                 }
             }
             catch (Exception ex)
@@ -218,6 +210,10 @@ namespace LazyChat.Services
                 }
 
                 byte[] messageData = message.Serialize();
+                if (messageData.Length > MAX_MESSAGE_SIZE)
+                {
+                    throw new InvalidDataException($"Message size too large: {messageData.Length}");
+                }
                 byte[] lengthBytes = BitConverter.GetBytes(messageData.Length);
 
                 NetworkStream stream = client.GetStream();
@@ -336,6 +332,21 @@ namespace LazyChat.Services
         public void Dispose()
         {
             Stop();
+        }
+
+        private bool ReadExact(NetworkStream stream, byte[] buffer, int length)
+        {
+            int offset = 0;
+            while (offset < length)
+            {
+                int read = stream.Read(buffer, offset, length - offset);
+                if (read == 0)
+                {
+                    return false;
+                }
+                offset += read;
+            }
+            return true;
         }
     }
 }
