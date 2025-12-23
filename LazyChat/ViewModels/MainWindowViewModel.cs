@@ -1020,76 +1020,23 @@ namespace LazyChat.ViewModels
 
         private void LoadSettings()
         {
-            try
-            {
-                string configPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "LazyChat", "settings.json");
-                
-                if (File.Exists(configPath))
-                {
-                    var json = File.ReadAllText(configPath);
-                    var settings = JsonSerializer.Deserialize<AppSettings>(json);
-                    if (settings != null)
-                    {
-                        _enterToSend = settings.EnterToSend;
-                    }
-                }
-            }
-            catch { }
+            var settings = SettingsManager.Load();
+            _enterToSend = settings.EnterToSend;
         }
 
         private void SaveSettings()
         {
-            try
-            {
-                string configDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "LazyChat");
-                
-                if (!Directory.Exists(configDir))
-                    Directory.CreateDirectory(configDir);
-                
-                string configPath = Path.Combine(configDir, "settings.json");
-                var settings = new AppSettings { EnterToSend = _enterToSend };
-                var json = JsonSerializer.Serialize(settings);
-                File.WriteAllText(configPath, json);
-            }
-            catch { }
+            SettingsManager.SetEnterToSend(_enterToSend);
         }
 
         private string LoadSavedUsername()
         {
-            try
-            {
-                string configPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "LazyChat", "config.txt");
-                
-                if (File.Exists(configPath))
-                {
-                    return File.ReadAllText(configPath).Trim();
-                }
-            }
-            catch { }
-            return null;
+            return SettingsManager.GetUserName();
         }
 
         private void SaveUsername(string username)
         {
-            try
-            {
-                string configDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "LazyChat");
-                
-                if (!Directory.Exists(configDir))
-                    Directory.CreateDirectory(configDir);
-                
-                string configPath = Path.Combine(configDir, "config.txt");
-                File.WriteAllText(configPath, username);
-            }
-            catch { }
+            SettingsManager.SetUserName(username);
         }
 
         private void Exit()
@@ -1296,11 +1243,6 @@ namespace LazyChat.ViewModels
     }
 
     // ========== MODELS ==========
-
-    public class AppSettings
-    {
-        public bool EnterToSend { get; set; } = true;
-    }
 
     public class ContactItem : INotifyPropertyChanged
     {

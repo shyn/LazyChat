@@ -92,67 +92,25 @@ namespace LazyChat.Services
             _broadcastClients = new List<UdpClient>();
             _activeInterfaces = new List<NetworkInterfaceInfo>();
             
-            // Setup data directory
-            string appDataPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "LazyChat");
-            if (!Directory.Exists(appDataPath))
-                Directory.CreateDirectory(appDataPath);
-            
-            // Load or generate persistent local peer ID
-            string localPeerId = LoadOrCreateLocalPeerId(appDataPath);
+            // Get persistent PeerId from centralized settings
+            string localPeerId = SettingsManager.GetPeerId();
             
             _localPeer = new PeerInfo
             {
-                PeerId = localPeerId,  // Use persistent ID instead of auto-generated one
+                PeerId = localPeerId,
                 UserName = userName,
                 Port = listeningPort,
                 IpAddress = _networkAdapter.GetLocalIPAddress()
             };
 
-            _cacheFilePath = Path.Combine(appDataPath, "peer_cache.dat");
+            // Setup cache file path
+            _cacheFilePath = Path.Combine(SettingsManager.SettingsDirectory, "peer_cache.dat");
 
             LoadPeerCache();
 
             _logger.LogInfo($"PeerDiscoveryService initialized for user '{userName}' on port {listeningPort}");
             _logger.LogInfo($"Local PeerId: {_localPeer.PeerId}");
             _logger.LogInfo($"Primary local IP: {_localPeer.IpAddress}");
-        }
-        
-        private string LoadOrCreateLocalPeerId(string appDataPath)
-        {
-            string peerIdFile = Path.Combine(appDataPath, "local_peer_id.txt");
-            
-            try
-            {
-                if (File.Exists(peerIdFile))
-                {
-                    string savedId = File.ReadAllText(peerIdFile).Trim();
-                    if (!string.IsNullOrEmpty(savedId) && Guid.TryParse(savedId, out _))
-                    {
-                        _logger.LogInfo($"Loaded existing local PeerId: {savedId}");
-                        return savedId;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning($"Failed to load local PeerId: {ex.Message}");
-            }
-            
-            // Generate new ID and save it
-            string newId = Guid.NewGuid().ToString();
-            try
-            {
-                File.WriteAllText(peerIdFile, newId);
-                _logger.LogInfo($"Created new local PeerId: {newId}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning($"Failed to save local PeerId: {ex.Message}");
-            }
-            
-            return newId;
         }
 
         public void Start()
