@@ -348,13 +348,7 @@ namespace LazyChat.ViewModels
                 OnPropertyChanged(nameof(FilteredContacts));
                 
                 // Update selected contact status if it's the same peer
-                if (SelectedContact?.PeerId == peer.PeerId)
-                {
-                    OnPropertyChanged(nameof(SelectedContactStatus));
-                    OnPropertyChanged(nameof(SelectedContactStatusColor));
-                    OnPropertyChanged(nameof(SelectedContactAvatarBackground));
-                    OnPropertyChanged(nameof(SelectedContactAvatarForeground));
-                }
+                RefreshSelectedContactStatus();
                 
                 UpdateCommandStates();
             });
@@ -372,17 +366,22 @@ namespace LazyChat.ViewModels
                     OnPropertyChanged(nameof(FilteredContacts));
                     
                     // Update selected contact status
-                    if (SelectedContact?.PeerId == peer.PeerId)
-                    {
-                        OnPropertyChanged(nameof(SelectedContactStatus));
-                        OnPropertyChanged(nameof(SelectedContactStatusColor));
-                        OnPropertyChanged(nameof(SelectedContactAvatarBackground));
-                        OnPropertyChanged(nameof(SelectedContactAvatarForeground));
-                    }
+                    RefreshSelectedContactStatus();
                 }
                 
                 UpdateCommandStates();
             });
+        }
+        
+        private void RefreshSelectedContactStatus()
+        {
+            // Always refresh these properties when any contact's online status changes
+            // This ensures the chat header stays in sync with the contact list
+            OnPropertyChanged(nameof(SelectedContactStatus));
+            OnPropertyChanged(nameof(SelectedContactStatusColor));
+            OnPropertyChanged(nameof(SelectedContactAvatarBackground));
+            OnPropertyChanged(nameof(SelectedContactAvatarForeground));
+            OnPropertyChanged(nameof(SelectedContactName));
         }
 
         // ========== MESSAGE HANDLING ==========

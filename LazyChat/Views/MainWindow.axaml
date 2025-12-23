@@ -205,10 +205,12 @@
                                 <TextBlock Text="{Binding SelectedContactName}" 
                                            FontSize="17"
                                            FontWeight="SemiBold"
-                                           Foreground="#1D1D1F"/>
+                                           Foreground="#1D1D1F"
+                                           TextTrimming="CharacterEllipsis"
+                                           MaxWidth="300"/>
                                 <TextBlock Text="{Binding SelectedContactStatus}" 
                                            FontSize="13"
-                                           Foreground="#86868B"/>
+                                           Foreground="{Binding SelectedContactStatusColor}"/>
                             </StackPanel>
                         </StackPanel>
                         
