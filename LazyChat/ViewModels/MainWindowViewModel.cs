@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -46,14 +47,17 @@ namespace LazyChat.ViewModels
         private FileTransferService _fileTransferService;
         private ChatHistoryStore _historyStore;
         private Dictionary<string, Conversation> _conversations;
+        private Dictionary<string, ConversationHistoryState> _historyStates;
+        private ConcurrentDictionary<string, long> _readVersionByPeer;
         private ContactItem _selectedContact;
         private string _statusText;
         private string _messageText;
         private string _searchText;
         private Dictionary<string, Window> _activeTransferWindows;
         private bool _isInitialized;
+        private bool _isRebuildingMessages;
         private const int RecentConversationLimit = 50;
-        private const int HistoryLoadLimit = 200;
+        private const int HistoryPageSize = 50;
         
         // Settings
         private bool _enterToSend = true; // Default: Enter sends, Shift+Enter for newline
@@ -63,12 +67,16 @@ namespace LazyChat.ViewModels
         public ObservableCollection<MessageViewModel> Messages { get; }
 
         public event PropertyChangedEventHandler PropertyChanged;
+        public event Action<string> ScrollToMessageRequested;
+        public event Action ScrollToBottomRequested;
 
         public MainWindowViewModel()
         {
             Contacts = new ObservableCollection<ContactItem>();
             Messages = new ObservableCollection<MessageViewModel>();
             _conversations = new Dictionary<string, Conversation>();
+            _historyStates = new Dictionary<string, ConversationHistoryState>();
+            _readVersionByPeer = new ConcurrentDictionary<string, long>();
             _activeTransferWindows = new Dictionary<string, Window>();
             _statusText = "正在连接...";
 
@@ -98,6 +106,8 @@ namespace LazyChat.ViewModels
         public bool HasContacts => Contacts.Count > 0;
         
         public bool HasSelectedContact => SelectedContact != null;
+
+        public bool IsRebuildingMessages => _isRebuildingMessages;
         
         public string SelectedContactName => SelectedContact?.DisplayName ?? "";
         
@@ -191,8 +201,6 @@ namespace LazyChat.ViewModels
                     if (_selectedContact != null)
                     {
                         LoadConversation(_selectedContact);
-                        // Clear unread when selecting
-                        _selectedContact.UnreadCount = 0;
                     }
                     
                     UpdateCommandStates();
@@ -260,8 +268,8 @@ namespace LazyChat.ViewModels
 
             OnPropertyChanged(nameof(CurrentUserDisplayText));
             InitializeServices();
+            InitializeHistory();  // Load history before starting services
             StartServices();
-            InitializeHistory();
             _isInitialized = true;
         }
 
@@ -594,24 +602,33 @@ namespace LazyChat.ViewModels
 
         private void AddMessageToConversation(string peerId, string peerName, ChatMessage message)
         {
-            if (_historyStore != null)
+            bool isCurrentConversation = SelectedContact != null && SelectedContact.PeerId == peerId;
+            bool isRead = message.IsSentByMe;
+            message.IsRead = isRead;
+            long readVersion = GetReadVersion(peerId);
+            bool isNewContact = false;
+            
+            // Update or create contact first
+            var contact = Contacts.FirstOrDefault(c => c.PeerId == peerId);
+            if (contact == null)
             {
-                Task.Run(() =>
+                contact = new ContactItem
                 {
-                    try
-                    {
-                        _historyStore.SaveMessage(message, peerId, peerName);
-                    }
-                    catch (Exception ex)
-                    {
-                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                        {
-                            StatusText = "保存历史记录失败: " + ex.Message;
-                        });
-                    }
-                });
+                    PeerId = peerId,
+                    DisplayName = peerName,
+                    IsOnline = false,
+                    LastMessageTime = message.Timestamp
+                };
+                Contacts.Add(contact);
+                isNewContact = true;
+            }
+            else
+            {
+                contact.LastMessageTime = message.Timestamp;
+                contact.DisplayName = peerName;
             }
 
+            // Update in-memory conversation for display
             if (!_conversations.ContainsKey(peerId))
             {
                 _conversations[peerId] = new Conversation
@@ -625,70 +642,104 @@ namespace LazyChat.ViewModels
             conv.PeerName = peerName;
             conv.Messages.Add(message);
             conv.LastMessageTime = message.Timestamp;
+            ChatMessage previousMessage = conv.Messages.Count > 1 ? conv.Messages[conv.Messages.Count - 2] : null;
 
-            // Update or create contact
-            var contact = Contacts.FirstOrDefault(c => c.PeerId == peerId);
-            if (contact == null)
+            ConversationHistoryState historyState = GetHistoryState(peerId);
+            historyState.LoadedMessageIds.Add(message.MessageId);
+            if (!historyState.OldestMessageUtc.HasValue)
             {
-                contact = new ContactItem
-                {
-                    PeerId = peerId,
-                    DisplayName = peerName,
-                    IsOnline = false,
-                    LastMessageTime = message.Timestamp
-                };
-                Contacts.Add(contact);
+                historyState.OldestMessageUtc = message.Timestamp.ToUniversalTime();
+                historyState.OldestMessageId = message.MessageId;
             }
-            else
+            if (!historyState.HasMoreNewer)
             {
-                contact.LastMessageTime = message.Timestamp;
-                contact.DisplayName = peerName;
+                historyState.NewestMessageUtc = message.Timestamp.ToUniversalTime();
+                historyState.NewestMessageId = message.MessageId;
             }
 
-            if (SelectedContact != null && SelectedContact.PeerId == peerId)
+            // Display message if current conversation
+            if (isCurrentConversation)
             {
-                DisplayMessage(message);
+                DisplayMessage(message, previousMessage);
                 ScrollToBottom();
             }
-            else
+            else if (isNewContact)
             {
-                conv.UnreadCount++;
-                contact.UnreadCount = conv.UnreadCount;
+                OnPropertyChanged(nameof(FilteredContacts));
             }
 
-            // Only notify FilteredContacts if a new contact was added
-            // Updating LastMessageTime on existing contact doesn't require re-sorting immediately
-            // This avoids issues with ListBox losing selection
+            // Save to database and update unread count
+            string capturedPeerId = peerId;
+            Task.Run(() =>
+            {
+                try
+                {
+                    bool currentIsRead = message.IsRead;
+                    _historyStore?.SaveMessage(message, capturedPeerId, peerName, isRead: currentIsRead);
+                    int unreadCount = _historyStore?.GetUnreadCount(capturedPeerId) ?? 0;
+                    
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        if (!IsReadVersionCurrent(capturedPeerId, readVersion))
+                        {
+                            return;
+                        }
+
+                        UpdateUnreadCount(contact, unreadCount);
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        StatusText = "保存历史记录失败: " + ex.Message;
+                    });
+                }
+            });
         }
 
-        private void DisplayMessage(ChatMessage message)
+        private void DisplayMessage(ChatMessage message, ChatMessage previousMessage)
         {
-            bool showDateSeparator = false;
-            if (Messages.Count == 0)
+            Messages.Add(CreateMessageViewModel(message, previousMessage));
+        }
+
+        private void RebuildMessageList(List<ChatMessage> messages)
+        {
+            Messages.Clear();
+
+            ChatMessage previous = null;
+            foreach (ChatMessage message in messages)
             {
-                showDateSeparator = true;
+                Messages.Add(CreateMessageViewModel(message, previous));
+                previous = message;
             }
-            else
-            {
-                var lastMsg = Messages.LastOrDefault();
-                if (lastMsg != null && lastMsg.Timestamp.Date != message.Timestamp.Date)
-                {
-                    showDateSeparator = true;
-                }
-            }
+        }
+
+        private MessageViewModel CreateMessageViewModel(ChatMessage message, ChatMessage previousMessage)
+        {
+            bool showDateSeparator = previousMessage == null || previousMessage.Timestamp.Date != message.Timestamp.Date;
 
             bool showSenderName = !message.IsSentByMe;
-            if (showSenderName && Messages.Count > 0)
+            if (showSenderName && previousMessage != null && !previousMessage.IsSentByMe &&
+                previousMessage.SenderName == message.SenderName &&
+                (message.Timestamp - previousMessage.Timestamp).TotalMinutes < 5)
             {
-                var lastMsg = Messages.LastOrDefault();
-                if (lastMsg != null && !lastMsg.IsSentByMe && lastMsg.SenderName == message.SenderName &&
-                    (message.Timestamp - lastMsg.Timestamp).TotalMinutes < 5)
-                {
-                    showSenderName = false;
-                }
+                showSenderName = false;
             }
 
-            Messages.Add(new MessageViewModel(message, showDateSeparator, showSenderName));
+            return new MessageViewModel(message, showDateSeparator, showSenderName);
+        }
+
+        private static int CompareMessages(ChatMessage left, ChatMessage right)
+        {
+            if (ReferenceEquals(left, right)) return 0;
+            if (left == null) return -1;
+            if (right == null) return 1;
+
+            int timeCompare = DateTime.Compare(left.Timestamp, right.Timestamp);
+            if (timeCompare != 0) return timeCompare;
+
+            return string.CompareOrdinal(left.MessageId, right.MessageId);
         }
 
         private void LoadConversation(ContactItem contact)
@@ -714,28 +765,117 @@ namespace LazyChat.ViewModels
 
                 conv.PeerName = contact.DisplayName;
                 conv.Messages.Clear();
-                conv.UnreadCount = 0;
-                contact.UnreadCount = 0;
 
                 string currentPeerId = contact.PeerId;
+                ResetHistoryState(currentPeerId);
+                long readVersion = IncrementReadVersion(currentPeerId);
                 Task.Run(() =>
                 {
-                    return _historyStore?.LoadMessagesForPeer(currentPeerId, HistoryLoadLimit) ?? new List<ChatMessage>();
+                    int unreadCount = _historyStore?.GetUnreadCount(currentPeerId) ?? 0;
+                    bool hasMoreBefore = false;
+                    bool hasMoreNewer = false;
+                    string anchorMessageId = null;
+                    List<ChatMessage> messages = new List<ChatMessage>();
+
+                    if (_historyStore != null)
+                    {
+                        bool hasUnreadAnchor = _historyStore.TryGetFirstUnreadAnchor(currentPeerId, out DateTime? anchorUtc, out string anchorId);
+                        if (hasUnreadAnchor && anchorUtc.HasValue && !string.IsNullOrWhiteSpace(anchorId))
+                        {
+                            messages = _historyStore.LoadMessagesStartingAt(currentPeerId, anchorUtc.Value, anchorId, HistoryPageSize, out hasMoreNewer);
+                            hasMoreBefore = _historyStore.HasMessagesBefore(currentPeerId, anchorUtc.Value, anchorId);
+                            anchorMessageId = anchorId;
+                        }
+                        else
+                        {
+                            messages = _historyStore.LoadMessagesPage(currentPeerId, null, null, HistoryPageSize, out hasMoreBefore);
+                            hasMoreNewer = false;
+                        }
+                    }
+
+                    return (Messages: messages, UnreadCount: unreadCount, HasMoreBefore: hasMoreBefore, HasMoreNewer: hasMoreNewer, AnchorMessageId: anchorMessageId);
                 }).ContinueWith(t =>
                 {
                     Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                     {
+                        if (!IsReadVersionCurrent(currentPeerId, readVersion))
+                        {
+                            return;
+                        }
+
+                        if (t.IsFaulted)
+                        {
+                            StatusText = "加载会话失败: " + t.Exception?.GetBaseException().Message;
+                            Task.Run(() =>
+                            {
+                                try
+                                {
+                                    int unreadCount = _historyStore?.GetUnreadCount(currentPeerId) ?? 0;
+                                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                                    {
+                                        if (!IsReadVersionCurrent(currentPeerId, readVersion))
+                                        {
+                                            return;
+                                        }
+
+                                        UpdateUnreadCount(contact, unreadCount);
+                                    });
+                                }
+                                catch
+                                {
+                                    // Ignore refresh failure
+                                }
+                            });
+                            return;
+                        }
+
+                        UpdateUnreadCount(contact, t.Result.UnreadCount);
+
                         if (SelectedContact == null || SelectedContact.PeerId != currentPeerId) return;
 
-                        foreach (ChatMessage msg in t.Result)
+                        ConversationHistoryState state = GetHistoryState(currentPeerId);
+                        state.HasMoreHistory = t.Result.HasMoreBefore;
+                        state.HasMoreNewer = t.Result.HasMoreNewer;
+                        state.LoadedMessageIds.Clear();
+                        if (t.Result.Messages.Count > 0)
                         {
-                            conv.Messages.Add(msg);
-                            DisplayMessage(msg);
+                            ChatMessage oldest = t.Result.Messages[0];
+                            ChatMessage newest = t.Result.Messages[t.Result.Messages.Count - 1];
+                            state.OldestMessageUtc = oldest.Timestamp.ToUniversalTime();
+                            state.OldestMessageId = oldest.MessageId;
+                            state.NewestMessageUtc = newest.Timestamp.ToUniversalTime();
+                            state.NewestMessageId = newest.MessageId;
+                            foreach (ChatMessage message in t.Result.Messages)
+                            {
+                                state.LoadedMessageIds.Add(message.MessageId);
+                            }
                         }
-                        
-                        ScrollToBottom();
+                        else
+                        {
+                            state.OldestMessageUtc = null;
+                            state.OldestMessageId = null;
+                            state.NewestMessageUtc = null;
+                            state.NewestMessageId = null;
+                        }
+
+                        conv.Messages.Clear();
+                        conv.Messages.AddRange(t.Result.Messages);
+                        _isRebuildingMessages = true;
+                        RebuildMessageList(conv.Messages);
+                        _isRebuildingMessages = false;
+
+                        if (!string.IsNullOrWhiteSpace(t.Result.AnchorMessageId) &&
+                            conv.Messages.Any(m => m.MessageId == t.Result.AnchorMessageId))
+                        {
+                            ScrollToMessageRequested?.Invoke(t.Result.AnchorMessageId);
+                        }
+                        else
+                        {
+                            ScrollToBottomRequested?.Invoke();
+                        }
                     });
                 });
+                
             }
         }
 
@@ -743,36 +883,180 @@ namespace LazyChat.ViewModels
         {
             Contacts.Clear();
 
-            Task.Run(() =>
+            var conversations = _historyStore?.LoadRecentConversations(RecentConversationLimit) ?? new List<ConversationSummary>();
+            
+            foreach (ConversationSummary item in conversations)
             {
-                return _historyStore?.LoadRecentConversations(RecentConversationLimit) ?? new List<ConversationSummary>();
-            }).ContinueWith(t =>
-            {
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                Contacts.Add(new ContactItem
                 {
-                    foreach (ConversationSummary item in t.Result)
-                    {
-                        // Only add if not already in contacts (from online discovery)
-                        if (!Contacts.Any(c => c.PeerId == item.PeerId))
-                        {
-                            Contacts.Add(new ContactItem
-                            {
-                                PeerId = item.PeerId,
-                                DisplayName = item.PeerName,
-                                IsOnline = false,
-                                LastMessageTime = item.LastMessageTime
-                            });
-                        }
-                    }
-                    OnPropertyChanged(nameof(HasContacts));
-                    OnPropertyChanged(nameof(FilteredContacts));
+                    PeerId = item.PeerId,
+                    DisplayName = item.PeerName,
+                    IsOnline = false,
+                    LastMessageTime = item.LastMessageTime,
+                    UnreadCount = item.UnreadCount
                 });
-            });
+            }
+            
+            OnPropertyChanged(nameof(HasContacts));
+            OnPropertyChanged(nameof(FilteredContacts));
         }
 
         private void ScrollToBottom()
         {
             // Handled by view
+        }
+
+        public bool HasMoreRecentForSelected()
+        {
+            if (SelectedContact == null)
+            {
+                return false;
+            }
+
+            ConversationHistoryState state = GetHistoryState(SelectedContact.PeerId);
+            return state.HasMoreNewer &&
+                   !state.IsLoadingNewer &&
+                   state.NewestMessageUtc.HasValue &&
+                   !string.IsNullOrWhiteSpace(state.NewestMessageId);
+        }
+
+        public bool HasMoreHistoryForSelected()
+        {
+            if (SelectedContact == null)
+            {
+                return false;
+            }
+
+            ConversationHistoryState state = GetHistoryState(SelectedContact.PeerId);
+            return state.HasMoreHistory &&
+                   !state.IsLoading &&
+                   state.OldestMessageUtc.HasValue &&
+                   !string.IsNullOrWhiteSpace(state.OldestMessageId);
+        }
+
+        public void MarkMessagesAsRead(IEnumerable<MessageViewModel> messageViewModels)
+        {
+            if (SelectedContact == null || _historyStore == null || messageViewModels == null)
+            {
+                return;
+            }
+
+            string peerId = SelectedContact.PeerId;
+            HashSet<string> uniqueIds = new HashSet<string>(StringComparer.Ordinal);
+            List<string> messageIds = new List<string>();
+            foreach (MessageViewModel message in messageViewModels)
+            {
+                if (message == null || message.IsSentByMe || message.IsRead)
+                {
+                    continue;
+                }
+
+                message.MarkRead();
+                if (uniqueIds.Add(message.MessageId))
+                {
+                    messageIds.Add(message.MessageId);
+                }
+            }
+
+            if (messageIds.Count == 0)
+            {
+                return;
+            }
+
+            long readVersion = GetReadVersion(peerId);
+            Task.Run(() =>
+            {
+                try
+                {
+                    _historyStore.MarkMessagesAsRead(peerId, messageIds);
+                    int unreadCount = _historyStore.GetUnreadCount(peerId);
+
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        if (!IsReadVersionCurrent(peerId, readVersion))
+                        {
+                            return;
+                        }
+
+                        ContactItem contact = Contacts.FirstOrDefault(c => c.PeerId == peerId);
+                        UpdateUnreadCount(contact, unreadCount);
+                    });
+                }
+                catch
+                {
+                    // Ignore read updates
+                }
+            });
+        }
+
+        private long GetReadVersion(string peerId)
+        {
+            if (string.IsNullOrWhiteSpace(peerId)) return 0;
+            return _readVersionByPeer.TryGetValue(peerId, out long version) ? version : 0;
+        }
+
+        private long IncrementReadVersion(string peerId)
+        {
+            if (string.IsNullOrWhiteSpace(peerId)) return 0;
+            return _readVersionByPeer.AddOrUpdate(peerId, 1, (_, current) => current + 1);
+        }
+
+        private bool IsReadVersionCurrent(string peerId, long version)
+        {
+            if (string.IsNullOrWhiteSpace(peerId)) return false;
+            if (_readVersionByPeer.TryGetValue(peerId, out long current))
+            {
+                return current == version;
+            }
+
+            return version == 0;
+        }
+
+        private void UpdateUnreadCount(ContactItem contact, int unreadCount)
+        {
+            if (contact != null)
+            {
+                contact.UnreadCount = unreadCount;
+            }
+        }
+
+        private ConversationHistoryState GetHistoryState(string peerId)
+        {
+            if (string.IsNullOrWhiteSpace(peerId))
+            {
+                return new ConversationHistoryState();
+            }
+
+            if (!_historyStates.TryGetValue(peerId, out ConversationHistoryState state))
+            {
+                state = new ConversationHistoryState();
+                _historyStates[peerId] = state;
+            }
+
+            return state;
+        }
+
+        private void ResetHistoryState(string peerId)
+        {
+            if (string.IsNullOrWhiteSpace(peerId))
+            {
+                return;
+            }
+
+            _historyStates[peerId] = new ConversationHistoryState();
+        }
+
+        private sealed class ConversationHistoryState
+        {
+            public DateTime? OldestMessageUtc { get; set; }
+            public string OldestMessageId { get; set; }
+            public DateTime? NewestMessageUtc { get; set; }
+            public string NewestMessageId { get; set; }
+            public bool HasMoreHistory { get; set; } = true;
+            public bool HasMoreNewer { get; set; }
+            public bool IsLoading { get; set; }
+            public bool IsLoadingNewer { get; set; }
+            public HashSet<string> LoadedMessageIds { get; } = new HashSet<string>(StringComparer.Ordinal);
         }
 
         // ========== SEND MESSAGES ==========
@@ -973,12 +1257,196 @@ namespace LazyChat.ViewModels
                 
                 // Remove from memory
                 _conversations.Remove(peerId);
+                _historyStates.Remove(peerId);
+                _readVersionByPeer.TryRemove(peerId, out _);
                 
                 // Remove from database
                 await Task.Run(() => _historyStore?.DeleteConversation(peerId));
                 
                 StatusText = "会话已删除";
                 OnPropertyChanged(nameof(FilteredContacts));
+            }
+        }
+
+        public async Task<bool> LoadMoreHistoryAsync()
+        {
+            if (SelectedContact == null || _historyStore == null)
+            {
+                return false;
+            }
+
+            string peerId = SelectedContact.PeerId;
+            if (!_conversations.TryGetValue(peerId, out Conversation conversation))
+            {
+                return false;
+            }
+
+            ConversationHistoryState state = GetHistoryState(peerId);
+            if (state.IsLoading || !state.HasMoreHistory)
+            {
+                return false;
+            }
+
+            state.IsLoading = true;
+            DateTime? beforeUtc = state.OldestMessageUtc;
+            string beforeMessageId = state.OldestMessageId;
+
+            try
+            {
+                var result = await Task.Run(() =>
+                {
+                    bool hasMore = false;
+                    List<ChatMessage> messages = _historyStore.LoadMessagesPage(peerId, beforeUtc, beforeMessageId, HistoryPageSize, out hasMore);
+                    return (Messages: messages, HasMore: hasMore);
+                });
+
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    state.HasMoreHistory = result.HasMore;
+                    if (result.Messages.Count == 0)
+                    {
+                        return;
+                    }
+
+                    List<ChatMessage> newMessages = new List<ChatMessage>();
+                    foreach (ChatMessage message in result.Messages)
+                    {
+                        if (state.LoadedMessageIds.Add(message.MessageId))
+                        {
+                            newMessages.Add(message);
+                        }
+                    }
+
+                    if (newMessages.Count == 0)
+                    {
+                        return;
+                    }
+
+                    state.OldestMessageUtc = newMessages[0].Timestamp.ToUniversalTime();
+                    state.OldestMessageId = newMessages[0].MessageId;
+                    conversation.Messages.InsertRange(0, newMessages);
+                    if (!state.NewestMessageUtc.HasValue && conversation.Messages.Count > 0)
+                    {
+                        ChatMessage newest = conversation.Messages[conversation.Messages.Count - 1];
+                        state.NewestMessageUtc = newest.Timestamp.ToUniversalTime();
+                        state.NewestMessageId = newest.MessageId;
+                    }
+
+                    if (SelectedContact != null && SelectedContact.PeerId == peerId)
+                    {
+                        _isRebuildingMessages = true;
+                        RebuildMessageList(conversation.Messages);
+                        _isRebuildingMessages = false;
+                    }
+                });
+
+                return result.Messages.Count > 0;
+            }
+            catch (Exception ex)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    StatusText = "加载历史记录失败: " + ex.Message;
+                });
+                return false;
+            }
+            finally
+            {
+                state.IsLoading = false;
+            }
+        }
+
+        public async Task<bool> LoadMoreRecentAsync(bool scrollToBottom)
+        {
+            if (SelectedContact == null || _historyStore == null)
+            {
+                return false;
+            }
+
+            string peerId = SelectedContact.PeerId;
+            if (!_conversations.TryGetValue(peerId, out Conversation conversation))
+            {
+                return false;
+            }
+
+            ConversationHistoryState state = GetHistoryState(peerId);
+            if (state.IsLoadingNewer || !state.HasMoreNewer)
+            {
+                return false;
+            }
+
+            if (!state.NewestMessageUtc.HasValue || string.IsNullOrWhiteSpace(state.NewestMessageId))
+            {
+                return false;
+            }
+
+            state.IsLoadingNewer = true;
+            DateTime? afterUtc = state.NewestMessageUtc;
+            string afterMessageId = state.NewestMessageId;
+
+            try
+            {
+                var result = await Task.Run(() =>
+                {
+                    bool hasMore = false;
+                    List<ChatMessage> messages = _historyStore.LoadMessagesAfter(peerId, afterUtc, afterMessageId, HistoryPageSize, out hasMore);
+                    return (Messages: messages, HasMore: hasMore);
+                });
+
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (SelectedContact == null || SelectedContact.PeerId != peerId)
+                    {
+                        return;
+                    }
+
+                    if (result.Messages.Count == 0)
+                    {
+                        state.HasMoreNewer = false;
+                        return;
+                    }
+
+                    bool added = false;
+                    foreach (ChatMessage message in result.Messages)
+                    {
+                        if (state.LoadedMessageIds.Add(message.MessageId))
+                        {
+                            conversation.Messages.Add(message);
+                            added = true;
+                        }
+                    }
+
+                    if (added)
+                    {
+                        conversation.Messages.Sort(CompareMessages);
+                        _isRebuildingMessages = true;
+                        RebuildMessageList(conversation.Messages);
+                        _isRebuildingMessages = false;
+                        if (scrollToBottom)
+                        {
+                            ScrollToBottomRequested?.Invoke();
+                        }
+                    }
+
+                    ChatMessage newest = result.Messages[result.Messages.Count - 1];
+                    state.NewestMessageUtc = newest.Timestamp.ToUniversalTime();
+                    state.NewestMessageId = newest.MessageId;
+                    state.HasMoreNewer = result.HasMore;
+                });
+
+                return result.Messages.Count > 0;
+            }
+            catch (Exception ex)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    StatusText = "加载历史记录失败: " + ex.Message;
+                });
+                return false;
+            }
+            finally
+            {
+                state.IsLoadingNewer = false;
             }
         }
 
@@ -1323,12 +1791,14 @@ namespace LazyChat.ViewModels
         }
 
         public string SenderName => _message.SenderName;
+        public string MessageId => _message.MessageId;
         public DateTime Timestamp => _message.Timestamp;
         public string TextContent => _message.TextContent;
         public bool IsTextMessage => _message.MessageType == ChatMessageType.Text;
         public bool IsImageMessage => _message.MessageType == ChatMessageType.Image;
         public bool IsFileMessage => _message.MessageType == ChatMessageType.File;
         public bool IsSentByMe => _message.IsSentByMe;
+        public bool IsRead => _message.IsRead;
 
         public bool ShowDateSeparator => _showDateSeparator && !IsSentByMe;
         public string DateSeparatorText
@@ -1387,6 +1857,11 @@ namespace LazyChat.ViewModels
         public string TimeText => _message.Timestamp.ToString("HH:mm");
 
         public Bitmap ImageBitmap => _message.ImageContent;
+
+        public void MarkRead()
+        {
+            _message.IsRead = true;
+        }
 
         private string FormatFileSize(long bytes)
         {

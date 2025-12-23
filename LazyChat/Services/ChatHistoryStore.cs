@@ -63,11 +63,36 @@ CREATE TABLE IF NOT EXISTS messages (
     image_data BLOB,
     file_name TEXT,
     file_size INTEGER,
-    is_sent_by_me INTEGER NOT NULL
+    is_sent_by_me INTEGER NOT NULL,
+    is_read INTEGER NOT NULL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS idx_messages_peer_time ON messages(peer_id, timestamp);
 ";
                         command.ExecuteNonQuery();
+                    }
+                    
+                    // Migration: add is_read column if not exists
+                    using (SqliteCommand command = connection.CreateCommand())
+                    {
+                        command.CommandText = "PRAGMA table_info(messages);";
+                        bool hasIsRead = false;
+                        using (var reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                if (reader.GetString(1) == "is_read")
+                                {
+                                    hasIsRead = true;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (!hasIsRead)
+                        {
+                            command.CommandText = "ALTER TABLE messages ADD COLUMN is_read INTEGER NOT NULL DEFAULT 1;";
+                            command.ExecuteNonQuery();
+                        }
                     }
                 }
 
@@ -75,7 +100,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_peer_time ON messages(peer_id, timestamp
             }
         }
 
-        public void SaveMessage(ChatMessage message, string peerId, string peerName)
+        public void SaveMessage(ChatMessage message, string peerId, string peerName, bool isRead = true)
         {
             if (message == null || string.IsNullOrWhiteSpace(peerId))
             {
@@ -106,7 +131,8 @@ INSERT OR REPLACE INTO messages (
     image_data,
     file_name,
     file_size,
-    is_sent_by_me
+    is_sent_by_me,
+    is_read
 ) VALUES (
     @message_id,
     @peer_id,
@@ -120,7 +146,8 @@ INSERT OR REPLACE INTO messages (
     @image_data,
     @file_name,
     @file_size,
-    @is_sent_by_me
+    @is_sent_by_me,
+    @is_read
 );
 ";
 
@@ -138,6 +165,7 @@ INSERT OR REPLACE INTO messages (
                         command.Parameters.AddWithValue("@file_name", message.FileName ?? string.Empty);
                         command.Parameters.AddWithValue("@file_size", message.FileSize);
                         command.Parameters.AddWithValue("@is_sent_by_me", message.IsSentByMe ? 1 : 0);
+                        command.Parameters.AddWithValue("@is_read", isRead ? 1 : 0);
 
                         command.ExecuteNonQuery();
                     }
@@ -162,7 +190,11 @@ INSERT OR REPLACE INTO messages (
                     using (SqliteCommand command = connection.CreateCommand())
                     {
                         command.CommandText = @"
-SELECT m.peer_id, m.peer_name, m.timestamp
+SELECT 
+    m.peer_id, 
+    m.peer_name, 
+    m.timestamp,
+    (SELECT COUNT(*) FROM messages WHERE peer_id = m.peer_id AND is_read = 0) AS unread_count
 FROM messages m
 INNER JOIN (
     SELECT peer_id, MAX(timestamp) AS last_time
@@ -181,6 +213,7 @@ LIMIT @limit;
                                 string peerId = reader.GetString(0);
                                 string peerName = reader.GetString(1);
                                 string timestamp = reader.GetString(2);
+                                int unreadCount = reader.GetInt32(3);
 
                                 DateTime parsedTime = DateTime.Parse(
                                     timestamp,
@@ -196,7 +229,8 @@ LIMIT @limit;
                                 {
                                     PeerId = peerId,
                                     PeerName = peerName,
-                                    LastMessageTime = parsedTime
+                                    LastMessageTime = parsedTime,
+                                    UnreadCount = unreadCount
                                 });
                             }
                         }
@@ -238,10 +272,11 @@ SELECT
     image_data,
     file_name,
     file_size,
-    is_sent_by_me
+    is_sent_by_me,
+    is_read
 FROM messages
 WHERE peer_id = @peer_id
-ORDER BY timestamp DESC
+ORDER BY timestamp DESC, message_id DESC
 LIMIT @limit;
 ";
                         command.Parameters.AddWithValue("@peer_id", peerId);
@@ -249,63 +284,7 @@ LIMIT @limit;
 
                         using (SqliteDataReader reader = command.ExecuteReader())
                         {
-                            while (reader.Read())
-                            {
-                                string messageId = reader.GetString(0);
-                                string senderId = reader.GetString(1);
-                                string senderName = reader.GetString(2);
-                                string receiverId = reader.GetString(3);
-                                string timestamp = reader.GetString(4);
-                                int messageType = reader.GetInt32(5);
-                                string textContent = reader.GetString(6);
-                                byte[] imageData = reader.IsDBNull(7) ? null : (byte[])reader.GetValue(7);
-                                string fileName = reader.GetString(8);
-                                long fileSize = reader.GetInt64(9);
-                                bool isSentByMe = reader.GetInt32(10) == 1;
-
-                                DateTime parsedTime = DateTime.Parse(
-                                    timestamp,
-                                    CultureInfo.InvariantCulture,
-                                    DateTimeStyles.RoundtripKind);
-
-                                if (parsedTime.Kind == DateTimeKind.Utc)
-                                {
-                                    parsedTime = parsedTime.ToLocalTime();
-                                }
-
-                                ChatMessage message = new ChatMessage
-                                {
-                                    MessageId = messageId,
-                                    SenderId = senderId,
-                                    SenderName = senderName,
-                                    ReceiverId = receiverId,
-                                    Timestamp = parsedTime,
-                                    MessageType = (ChatMessageType)messageType,
-                                    TextContent = textContent,
-                                    FileName = fileName,
-                                    FileSize = fileSize,
-                                    IsSentByMe = isSentByMe,
-                                    ImageBytes = imageData
-                                };
-
-                                if (imageData != null && imageData.Length > 0)
-                                {
-                                    try
-                                    {
-                                        using (MemoryStream ms = new MemoryStream(imageData))
-                                        {
-                                            message.ImageContent = new Avalonia.Media.Imaging.Bitmap(ms);
-                                        }
-                                    }
-                                    catch
-                                    {
-                                        message.MessageType = ChatMessageType.Text;
-                                        message.TextContent = "图片加载失败";
-                                    }
-                                }
-
-                                result.Add(message);
-                            }
+                            result = ReadMessages(reader);
                         }
                     }
                 }
@@ -313,6 +292,573 @@ LIMIT @limit;
 
             result.Reverse();
             return result;
+        }
+
+        public bool TryGetFirstUnreadAnchor(string peerId, out DateTime? anchorUtc, out string anchorMessageId)
+        {
+            anchorUtc = null;
+            anchorMessageId = null;
+
+            if (string.IsNullOrWhiteSpace(peerId))
+            {
+                return false;
+            }
+
+            Initialize();
+
+            lock (_lock)
+            {
+                using (SqliteConnection connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    using (SqliteCommand command = connection.CreateCommand())
+                    {
+                        command.CommandText = @"
+SELECT message_id, timestamp
+FROM messages
+WHERE peer_id = @peer_id AND is_read = 0
+ORDER BY timestamp ASC, message_id ASC
+LIMIT 1;
+";
+                        command.Parameters.AddWithValue("@peer_id", peerId);
+
+                        using (SqliteDataReader reader = command.ExecuteReader())
+                        {
+                            if (!reader.Read())
+                            {
+                                return false;
+                            }
+
+                            string messageId = reader.GetString(0);
+                            string timestamp = reader.GetString(1);
+
+                            DateTime parsedTime = DateTime.Parse(
+                                timestamp,
+                                CultureInfo.InvariantCulture,
+                                DateTimeStyles.RoundtripKind);
+
+                            if (parsedTime.Kind == DateTimeKind.Local)
+                            {
+                                parsedTime = parsedTime.ToUniversalTime();
+                            }
+                            else if (parsedTime.Kind == DateTimeKind.Unspecified)
+                            {
+                                parsedTime = DateTime.SpecifyKind(parsedTime, DateTimeKind.Utc);
+                            }
+
+                            anchorUtc = parsedTime;
+                            anchorMessageId = messageId;
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        public List<ChatMessage> LoadMessagesEndingAt(string peerId, DateTime endUtc, string endMessageId, int limit, out bool hasMoreBefore)
+        {
+            Initialize();
+
+            hasMoreBefore = false;
+            List<ChatMessage> result = new List<ChatMessage>();
+
+            if (string.IsNullOrWhiteSpace(peerId) || limit <= 0)
+            {
+                return result;
+            }
+
+            lock (_lock)
+            {
+                using (SqliteConnection connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    using (SqliteCommand command = connection.CreateCommand())
+                    {
+                        string endFilter;
+                        string endText = endUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
+                        if (!string.IsNullOrWhiteSpace(endMessageId))
+                        {
+                            endFilter = "AND (timestamp < @end OR (timestamp = @end AND message_id <= @end_id))";
+                        }
+                        else
+                        {
+                            endFilter = "AND timestamp <= @end";
+                        }
+
+                        command.CommandText = $@"
+SELECT
+    message_id,
+    sender_id,
+    sender_name,
+    receiver_id,
+    timestamp,
+    message_type,
+    text_content,
+    image_data,
+    file_name,
+    file_size,
+    is_sent_by_me,
+    is_read
+FROM messages
+WHERE peer_id = @peer_id
+{endFilter}
+ORDER BY timestamp DESC, message_id DESC
+LIMIT @limit;
+";
+                        command.Parameters.AddWithValue("@peer_id", peerId);
+                        command.Parameters.AddWithValue("@limit", limit + 1);
+                        command.Parameters.AddWithValue("@end", endText);
+                        if (!string.IsNullOrWhiteSpace(endMessageId))
+                        {
+                            command.Parameters.AddWithValue("@end_id", endMessageId);
+                        }
+
+                        using (SqliteDataReader reader = command.ExecuteReader())
+                        {
+                            result = ReadMessages(reader);
+                        }
+                    }
+                }
+            }
+
+            if (result.Count > limit)
+            {
+                hasMoreBefore = true;
+                result.RemoveAt(result.Count - 1);
+            }
+
+            result.Reverse();
+            return result;
+        }
+
+        public List<ChatMessage> LoadMessagesAfter(string peerId, DateTime? afterUtc, string afterMessageId, int limit, out bool hasMoreAfter)
+        {
+            Initialize();
+
+            hasMoreAfter = false;
+            List<ChatMessage> result = new List<ChatMessage>();
+
+            if (string.IsNullOrWhiteSpace(peerId) || limit <= 0)
+            {
+                return result;
+            }
+
+            lock (_lock)
+            {
+                using (SqliteConnection connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    using (SqliteCommand command = connection.CreateCommand())
+                    {
+                        string afterFilter = string.Empty;
+                        if (afterUtc.HasValue)
+                        {
+                            string afterText = afterUtc.Value.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
+                            if (!string.IsNullOrWhiteSpace(afterMessageId))
+                            {
+                                afterFilter = "AND (timestamp > @after OR (timestamp = @after AND message_id > @after_id))";
+                                command.Parameters.AddWithValue("@after_id", afterMessageId);
+                            }
+                            else
+                            {
+                                afterFilter = "AND timestamp > @after";
+                            }
+                            command.Parameters.AddWithValue("@after", afterText);
+                        }
+
+                        command.CommandText = $@"
+SELECT
+    message_id,
+    sender_id,
+    sender_name,
+    receiver_id,
+    timestamp,
+    message_type,
+    text_content,
+    image_data,
+    file_name,
+    file_size,
+    is_sent_by_me,
+    is_read
+FROM messages
+WHERE peer_id = @peer_id
+{afterFilter}
+ORDER BY timestamp ASC, message_id ASC
+LIMIT @limit;
+";
+                        command.Parameters.AddWithValue("@peer_id", peerId);
+                        command.Parameters.AddWithValue("@limit", limit + 1);
+
+                        using (SqliteDataReader reader = command.ExecuteReader())
+                        {
+                            result = ReadMessages(reader);
+                        }
+                    }
+                }
+            }
+
+            if (result.Count > limit)
+            {
+                hasMoreAfter = true;
+                result.RemoveAt(result.Count - 1);
+            }
+
+            return result;
+        }
+
+        public List<ChatMessage> LoadMessagesStartingAt(string peerId, DateTime startUtc, string startMessageId, int limit, out bool hasMoreAfter)
+        {
+            Initialize();
+
+            hasMoreAfter = false;
+            List<ChatMessage> result = new List<ChatMessage>();
+
+            if (string.IsNullOrWhiteSpace(peerId) || limit <= 0)
+            {
+                return result;
+            }
+
+            lock (_lock)
+            {
+                using (SqliteConnection connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    using (SqliteCommand command = connection.CreateCommand())
+                    {
+                        string startFilter;
+                        string startText = startUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
+                        if (!string.IsNullOrWhiteSpace(startMessageId))
+                        {
+                            startFilter = "AND (timestamp > @start OR (timestamp = @start AND message_id >= @start_id))";
+                            command.Parameters.AddWithValue("@start_id", startMessageId);
+                        }
+                        else
+                        {
+                            startFilter = "AND timestamp >= @start";
+                        }
+
+                        command.CommandText = $@"
+SELECT
+    message_id,
+    sender_id,
+    sender_name,
+    receiver_id,
+    timestamp,
+    message_type,
+    text_content,
+    image_data,
+    file_name,
+    file_size,
+    is_sent_by_me,
+    is_read
+FROM messages
+WHERE peer_id = @peer_id
+{startFilter}
+ORDER BY timestamp ASC, message_id ASC
+LIMIT @limit;
+";
+                        command.Parameters.AddWithValue("@peer_id", peerId);
+                        command.Parameters.AddWithValue("@limit", limit + 1);
+                        command.Parameters.AddWithValue("@start", startText);
+
+                        using (SqliteDataReader reader = command.ExecuteReader())
+                        {
+                            result = ReadMessages(reader);
+                        }
+                    }
+                }
+            }
+
+            if (result.Count > limit)
+            {
+                hasMoreAfter = true;
+                result.RemoveAt(result.Count - 1);
+            }
+
+            return result;
+        }
+
+        public bool HasMessagesAfter(string peerId, DateTime afterUtc, string afterMessageId)
+        {
+            if (string.IsNullOrWhiteSpace(peerId))
+            {
+                return false;
+            }
+
+            Initialize();
+
+            lock (_lock)
+            {
+                using (SqliteConnection connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    using (SqliteCommand command = connection.CreateCommand())
+                    {
+                        string filter;
+                        if (!string.IsNullOrWhiteSpace(afterMessageId))
+                        {
+                            filter = "(timestamp > @after OR (timestamp = @after AND message_id > @after_id))";
+                            command.Parameters.AddWithValue("@after_id", afterMessageId);
+                        }
+                        else
+                        {
+                            filter = "timestamp > @after";
+                        }
+
+                        command.CommandText = $@"
+SELECT 1
+FROM messages
+WHERE peer_id = @peer_id
+  AND {filter}
+LIMIT 1;
+";
+                        command.Parameters.AddWithValue("@peer_id", peerId);
+                        command.Parameters.AddWithValue("@after", afterUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture));
+
+                        using (SqliteDataReader reader = command.ExecuteReader())
+                        {
+                            return reader.Read();
+                        }
+                    }
+                }
+            }
+        }
+
+        public bool HasMessagesBefore(string peerId, DateTime beforeUtc, string beforeMessageId)
+        {
+            if (string.IsNullOrWhiteSpace(peerId))
+            {
+                return false;
+            }
+
+            Initialize();
+
+            lock (_lock)
+            {
+                using (SqliteConnection connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    using (SqliteCommand command = connection.CreateCommand())
+                    {
+                        string filter;
+                        if (!string.IsNullOrWhiteSpace(beforeMessageId))
+                        {
+                            filter = "(timestamp < @before OR (timestamp = @before AND message_id < @before_id))";
+                            command.Parameters.AddWithValue("@before_id", beforeMessageId);
+                        }
+                        else
+                        {
+                            filter = "timestamp < @before";
+                        }
+
+                        command.CommandText = $@"
+SELECT 1
+FROM messages
+WHERE peer_id = @peer_id
+  AND {filter}
+LIMIT 1;
+";
+                        command.Parameters.AddWithValue("@peer_id", peerId);
+                        command.Parameters.AddWithValue("@before", beforeUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture));
+
+                        using (SqliteDataReader reader = command.ExecuteReader())
+                        {
+                            return reader.Read();
+                        }
+                    }
+                }
+            }
+        }
+
+        public List<ChatMessage> LoadMessagesPage(string peerId, DateTime? beforeUtc, string beforeMessageId, int limit, out bool hasMore)
+        {
+            Initialize();
+
+            hasMore = false;
+            List<ChatMessage> result = new List<ChatMessage>();
+
+            if (string.IsNullOrWhiteSpace(peerId) || limit <= 0)
+            {
+                return result;
+            }
+
+            lock (_lock)
+            {
+                using (SqliteConnection connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    using (SqliteCommand command = connection.CreateCommand())
+                    {
+                        string beforeFilter = string.Empty;
+                        if (beforeUtc.HasValue && !string.IsNullOrWhiteSpace(beforeMessageId))
+                        {
+                            beforeFilter = "AND (timestamp < @before OR (timestamp = @before AND message_id < @before_id))";
+                        }
+                        else if (beforeUtc.HasValue)
+                        {
+                            beforeFilter = "AND timestamp < @before";
+                        }
+                        command.CommandText = $@"
+SELECT
+    message_id,
+    sender_id,
+    sender_name,
+    receiver_id,
+    timestamp,
+    message_type,
+    text_content,
+    image_data,
+    file_name,
+    file_size,
+    is_sent_by_me,
+    is_read
+FROM messages
+WHERE peer_id = @peer_id
+{beforeFilter}
+ORDER BY timestamp DESC, message_id DESC
+LIMIT @limit;
+";
+                        command.Parameters.AddWithValue("@peer_id", peerId);
+                        command.Parameters.AddWithValue("@limit", limit + 1);
+                        if (beforeUtc.HasValue)
+                        {
+                            string beforeText = beforeUtc.Value.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
+                            command.Parameters.AddWithValue("@before", beforeText);
+                            if (!string.IsNullOrWhiteSpace(beforeMessageId))
+                            {
+                                command.Parameters.AddWithValue("@before_id", beforeMessageId);
+                            }
+                        }
+
+                        using (SqliteDataReader reader = command.ExecuteReader())
+                        {
+                            result = ReadMessages(reader);
+                        }
+                    }
+                }
+            }
+
+            if (result.Count > limit)
+            {
+                hasMore = true;
+                result.RemoveAt(result.Count - 1);
+            }
+
+            result.Reverse();
+            return result;
+        }
+
+        private static List<ChatMessage> ReadMessages(SqliteDataReader reader)
+        {
+            List<ChatMessage> result = new List<ChatMessage>();
+
+            while (reader.Read())
+            {
+                string messageId = reader.GetString(0);
+                string senderId = reader.GetString(1);
+                string senderName = reader.GetString(2);
+                string receiverId = reader.GetString(3);
+                string timestamp = reader.GetString(4);
+                int messageType = reader.GetInt32(5);
+                string textContent = reader.GetString(6);
+                byte[] imageData = reader.IsDBNull(7) ? null : (byte[])reader.GetValue(7);
+                string fileName = reader.GetString(8);
+                long fileSize = reader.GetInt64(9);
+                bool isSentByMe = reader.GetInt32(10) == 1;
+                bool isRead = reader.GetInt32(11) == 1;
+
+                DateTime parsedTime = DateTime.Parse(
+                    timestamp,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind);
+
+                if (parsedTime.Kind == DateTimeKind.Utc)
+                {
+                    parsedTime = parsedTime.ToLocalTime();
+                }
+
+                ChatMessage message = new ChatMessage
+                {
+                    MessageId = messageId,
+                    SenderId = senderId,
+                    SenderName = senderName,
+                    ReceiverId = receiverId,
+                    Timestamp = parsedTime,
+                    MessageType = (ChatMessageType)messageType,
+                    TextContent = textContent,
+                    FileName = fileName,
+                    FileSize = fileSize,
+                    IsSentByMe = isSentByMe,
+                    IsRead = isRead,
+                    ImageBytes = imageData
+                };
+
+                if (imageData != null && imageData.Length > 0)
+                {
+                    try
+                    {
+                        using (MemoryStream ms = new MemoryStream(imageData))
+                        {
+                            message.ImageContent = new Avalonia.Media.Imaging.Bitmap(ms);
+                        }
+                    }
+                    catch
+                    {
+                        message.MessageType = ChatMessageType.Text;
+                        message.TextContent = "图片加载失败";
+                    }
+                }
+
+                result.Add(message);
+            }
+
+            return result;
+        }
+
+        public void MarkMessagesAsRead(string peerId, IReadOnlyList<string> messageIds)
+        {
+            if (string.IsNullOrWhiteSpace(peerId) || messageIds == null || messageIds.Count == 0)
+            {
+                return;
+            }
+
+            Initialize();
+
+            lock (_lock)
+            {
+                using (SqliteConnection connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    using (SqliteCommand command = connection.CreateCommand())
+                    {
+                        List<string> parameters = new List<string>(messageIds.Count);
+                        for (int i = 0; i < messageIds.Count; i++)
+                        {
+                            string paramName = "@id" + i;
+                            parameters.Add(paramName);
+                            command.Parameters.AddWithValue(paramName, messageIds[i]);
+                        }
+
+                        command.CommandText = $@"
+UPDATE messages
+SET is_read = 1
+WHERE peer_id = @peer_id
+  AND is_read = 0
+  AND message_id IN ({string.Join(", ", parameters)});
+";
+                        command.Parameters.AddWithValue("@peer_id", peerId);
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
         }
 
         private void PruneHistoryIfNeeded(SqliteConnection connection)
@@ -381,6 +927,50 @@ WHERE message_id IN (
                         command.CommandText = "DELETE FROM messages WHERE peer_id = @peer_id;";
                         command.Parameters.AddWithValue("@peer_id", peerId);
                         command.ExecuteNonQuery();
+                    }
+                }
+            }
+        }
+
+        public void MarkConversationAsRead(string peerId)
+        {
+            if (string.IsNullOrWhiteSpace(peerId)) return;
+
+            Initialize();
+
+            lock (_lock)
+            {
+                using (SqliteConnection connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    using (SqliteCommand command = connection.CreateCommand())
+                    {
+                        command.CommandText = "UPDATE messages SET is_read = 1 WHERE peer_id = @peer_id AND is_read = 0;";
+                        command.Parameters.AddWithValue("@peer_id", peerId);
+                        command.ExecuteNonQuery();
+                    }
+                }
+            }
+        }
+
+        public int GetUnreadCount(string peerId)
+        {
+            if (string.IsNullOrWhiteSpace(peerId)) return 0;
+
+            Initialize();
+
+            lock (_lock)
+            {
+                using (SqliteConnection connection = new SqliteConnection(_connectionString))
+                {
+                    connection.Open();
+
+                    using (SqliteCommand command = connection.CreateCommand())
+                    {
+                        command.CommandText = "SELECT COUNT(*) FROM messages WHERE peer_id = @peer_id AND is_read = 0;";
+                        command.Parameters.AddWithValue("@peer_id", peerId);
+                        return Convert.ToInt32(command.ExecuteScalar());
                     }
                 }
             }

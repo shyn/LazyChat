@@ -34,6 +34,7 @@ namespace LazyChat.Models
         public long FileSize { get; set; }
         public bool IsGroupMessage { get; set; }
         public bool IsSentByMe { get; set; }
+        public bool IsRead { get; set; }
 
         public ChatMessage()
         {
@@ -57,7 +58,6 @@ namespace LazyChat.Models
         public string PeerName { get; set; }
         public List<ChatMessage> Messages { get; set; }
         public DateTime LastMessageTime { get; set; }
-        public int UnreadCount { get; set; }
         public bool IsGroupChat { get; set; }
 
         public Conversation()
