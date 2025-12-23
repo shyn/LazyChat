@@ -30,11 +30,34 @@ namespace LazyChat.Views
             
             if (_messageTextBox != null)
             {
-                _messageTextBox.KeyDown += MessageTextBox_KeyDown;
+                // Use PreviewKeyDown (tunneling) to intercept before TextBox handles it
+                _messageTextBox.AddHandler(KeyDownEvent, MessageTextBox_PreviewKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
+                
+                // Update AcceptsReturn based on current setting
+                UpdateAcceptsReturn();
+                
+                // Listen for setting changes
+                _viewModel.PropertyChanged += (s, args) =>
+                {
+                    if (args.PropertyName == nameof(_viewModel.EnterToSend))
+                    {
+                        UpdateAcceptsReturn();
+                    }
+                };
             }
         }
 
-        private void MessageTextBox_KeyDown(object sender, KeyEventArgs e)
+        private void UpdateAcceptsReturn()
+        {
+            if (_messageTextBox != null)
+            {
+                // If EnterToSend is true, don't accept return (Enter sends)
+                // If EnterToSend is false, accept return (Enter = newline, Ctrl+Enter sends)
+                _messageTextBox.AcceptsReturn = !_viewModel.EnterToSend;
+            }
+        }
+
+        private void MessageTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Enter)
             {
@@ -44,19 +67,41 @@ namespace LazyChat.Views
                 if (_viewModel.EnterToSend)
                 {
                     // Enter to send mode
-                    if (!isShiftPressed && !isCtrlPressed)
+                    if (isShiftPressed)
+                    {
+                        // Shift+Enter: insert newline manually
+                        e.Handled = true;
+                        InsertNewLine();
+                    }
+                    else if (!isCtrlPressed)
                     {
                         // Plain Enter: send message
                         e.Handled = true;
                         _viewModel.SendMessageCommand.Execute(null);
                     }
-                    // Shift+Enter: let default behavior (newline) happen
                 }
                 else
                 {
-                    // Ctrl+Enter to send mode (handled by KeyBinding)
-                    // Plain Enter: let default behavior (newline) happen
+                    // Ctrl+Enter to send mode
+                    if (isCtrlPressed)
+                    {
+                        // Ctrl+Enter: send message
+                        e.Handled = true;
+                        _viewModel.SendMessageCommand.Execute(null);
+                    }
+                    // Plain Enter: let TextBox handle it (newline) - AcceptsReturn is true
                 }
+            }
+        }
+
+        private void InsertNewLine()
+        {
+            if (_messageTextBox != null)
+            {
+                int caretIndex = _messageTextBox.CaretIndex;
+                string text = _messageTextBox.Text ?? "";
+                _messageTextBox.Text = text.Insert(caretIndex, "\n");
+                _messageTextBox.CaretIndex = caretIndex + 1;
             }
         }
 
@@ -76,12 +121,6 @@ namespace LazyChat.Views
         {
             _viewModel?.Cleanup();
             _viewModel.Messages.CollectionChanged -= Messages_CollectionChanged;
-            
-            if (_messageTextBox != null)
-            {
-                _messageTextBox.KeyDown -= MessageTextBox_KeyDown;
-            }
-            
             base.OnClosing(e);
         }
     }

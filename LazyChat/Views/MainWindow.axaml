@@ -365,18 +365,14 @@
                                      x:Name="MessageTextBox"
                                      Text="{Binding MessageText}"
                                      Watermark="输入消息..."
-                                     AcceptsReturn="True"
+                                     AcceptsReturn="{Binding !EnterToSend}"
                                      TextWrapping="Wrap"
                                      MinHeight="40"
                                      MaxHeight="120"
                                      BorderThickness="0"
                                      Background="Transparent"
                                      Padding="16,10"
-                                     FontSize="15">
-                                <TextBox.KeyBindings>
-                                    <KeyBinding Gesture="Ctrl+Enter" Command="{Binding SendMessageCommand}"/>
-                                </TextBox.KeyBindings>
-                            </TextBox>
+                                     FontSize="15"/>
                             
                             <!-- Attachment buttons inside input -->
                             <StackPanel Grid.Column="1" 
