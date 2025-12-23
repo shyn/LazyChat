@@ -657,7 +657,9 @@ namespace LazyChat.ViewModels
                 contact.UnreadCount = conv.UnreadCount;
             }
 
-            OnPropertyChanged(nameof(FilteredContacts));
+            // Only notify FilteredContacts if a new contact was added
+            // Updating LastMessageTime on existing contact doesn't require re-sorting immediately
+            // This avoids issues with ListBox losing selection
         }
 
         private void DisplayMessage(ChatMessage message)
