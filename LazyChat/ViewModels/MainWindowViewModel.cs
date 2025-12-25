@@ -520,20 +520,24 @@ namespace LazyChat.ViewModels
                     if (result && dialog.IsAccepted)
                     {
                         _fileTransferService.AcceptFileTransfer(transfer.FileId, dialog.SavePath);
-                        var contact = Contacts.FirstOrDefault(c => c.PeerId == transfer.SenderId);
-                        if (contact != null && contact.IsOnline)
+                        var peer = ResolvePeerForTransferResponse(transfer.SenderId);
+                        if (peer != null)
                         {
-                            var peer = CreatePeerInfoFromContact(contact);
                             _commService.SendFileTransferResponse(true, transfer.FileId, peer, _userName);
+                        }
+                        else
+                        {
+                            StatusText = "无法响应文件传输请求: 找不到对端地址";
+                            ShowError("无法发送文件传输响应，请稍后重试或重新选择联系人。");
+                            _fileTransferService.CancelTransfer(transfer.FileId);
                         }
                     }
                     else
                     {
                         _fileTransferService.RejectFileTransfer(transfer.FileId);
-                        var contact = Contacts.FirstOrDefault(c => c.PeerId == transfer.SenderId);
-                        if (contact != null && contact.IsOnline)
+                        var peer = ResolvePeerForTransferResponse(transfer.SenderId);
+                        if (peer != null)
                         {
-                            var peer = CreatePeerInfoFromContact(contact);
                             _commService.SendFileTransferResponse(false, transfer.FileId, peer, _userName);
                         }
                         _activeTransferWindows.Remove(transfer.FileId);
@@ -1537,6 +1541,23 @@ namespace LazyChat.ViewModels
                 Port = contact.Port,
                 IsOnline = contact.IsOnline
             };
+        }
+
+        private PeerInfo ResolvePeerForTransferResponse(string peerId)
+        {
+            var contact = Contacts.FirstOrDefault(c => c.PeerId == peerId);
+            if (contact != null && !string.IsNullOrWhiteSpace(contact.IpAddress) && contact.Port > 0)
+            {
+                return CreatePeerInfoFromContact(contact);
+            }
+
+            var onlinePeer = _discoveryService?.GetOnlinePeers()?.FirstOrDefault(p => p.PeerId == peerId);
+            if (onlinePeer != null && !string.IsNullOrWhiteSpace(onlinePeer.IpAddressString) && onlinePeer.Port > 0)
+            {
+                return onlinePeer;
+            }
+
+            return null;
         }
 
         private void Service_ErrorOccurred(object sender, string error)
